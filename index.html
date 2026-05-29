@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Voxel Showdown - Stone Paper Scissors</title>
+  <link rel="icon" href="data:,">
   <!-- SEO Meta Tags -->
   <meta name="description" content="An epic Minecraft and Roblox-inspired Stone, Paper, Scissors game. Battle the AI, choose custom skins, track streaks, and hear retro 8-bit sounds!">
   <!-- Google Fonts -->
@@ -28,7 +29,14 @@
         <span class="pixel-text-gold">VOXEL</span>
         <span class="pixel-text-white">SHOWDOWN</span>
       </div>
-      <div class="audio-control">
+      <div class="header-controls" style="display: flex; gap: 8px;">
+        <!-- Timer Toggle Button -->
+        <button id="timer-toggle-btn" class="pixel-btn-small" aria-label="Toggle timer" title="Toggle Timer">
+          <svg class="timer-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+          </svg>
+        </button>
+
         <button id="mute-btn" class="pixel-btn-small" aria-label="Mute sound" title="Toggle Sound">
           <svg class="audio-icon" viewBox="0 0 24 24" width="18" height="18">
             <path id="audio-path" fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
@@ -131,8 +139,45 @@
             <div class="mode-buttons">
               <button id="mode-endless" class="pixel-btn mode-btn active">ENDLESS</button>
               <button id="mode-match" class="pixel-btn mode-btn">MATCH PLAY</button>
+              <button id="mode-versus" class="pixel-btn mode-btn">ONLINE VERSUS</button>
             </div>
             <p id="mode-desc" class="mode-description">Fight infinitely to stack score and streaks. No HP cap.</p>
+
+            <!-- Multiplayer Lobby Panel -->
+            <div id="multiplayer-panel" class="pixel-box-dark multiplayer-box" style="display: none; margin-top: 20px; padding: 16px; text-align: left;">
+              <h3 class="section-title" style="margin-bottom: 12px; color: var(--color-cyan);">MULTIPLAYER LOBBY</h3>
+              
+              <div class="lobby-status-container" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; background: rgba(0,0,0,0.3); padding: 8px 12px; border: 2px solid var(--border-black);">
+                <span class="status-dot red" id="lobby-status-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--color-red);"></span>
+                <span id="lobby-status-text" class="pixel-subtitle" style="font-size: 10px; letter-spacing: 1px; margin: 0; color: #fff;">STATUS: DISCONNECTED</span>
+              </div>
+              
+              <!-- Host lobby controls -->
+              <div id="lobby-host-controls" class="lobby-section">
+                <button id="btn-create-lobby" class="pixel-btn" style="width: 100%; margin-bottom: 8px;">CREATE LOBBY</button>
+                <div id="invite-link-container" style="display: none; margin-top: 8px;">
+                  <p class="mode-description" style="margin-bottom: 6px;">Share this invite link with your friend:</p>
+                  <div class="invite-link-row" style="display: flex;">
+                    <input type="text" id="invite-link-input" readonly class="pixel-input" value="" style="flex-grow: 1; margin-right: 8px; background-color: #111; color: #fff; border: 2px solid var(--border-black); padding: 8px; font-family: monospace; font-size: 10px;">
+                    <button id="btn-copy-link" class="pixel-btn-small" style="padding: 10px; font-size: 9px;">COPY</button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="lobby-divider" style="text-align: center; margin: 12px 0; font-family: var(--font-pixel-sub); font-size: 10px; color: #94a3b8; position: relative;">
+                <span style="background: var(--panel-light); padding: 0 8px; position: relative; z-index: 2;">OR</span>
+                <div style="position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border-black); z-index: 1;"></div>
+              </div>
+              
+              <!-- Join lobby controls -->
+              <div id="lobby-join-controls" class="lobby-section">
+                <p class="mode-description" style="margin-bottom: 6px;">Enter friend's Lobby Code:</p>
+                <div class="invite-link-row" style="display: flex;">
+                  <input type="text" id="lobby-code-input" class="pixel-input" placeholder="LOBBY CODE" style="flex-grow: 1; margin-right: 8px; background-color: #111; color: #fff; border: 2px solid var(--border-black); padding: 8px; font-family: monospace; font-size: 11px;">
+                  <button id="btn-join-lobby" class="pixel-btn" style="padding: 6px 12px; font-size: 10px;">JOIN</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -209,6 +254,9 @@
                 <!-- Selected Weapon SVG -->
               </div>
             </div>
+            
+            <!-- Countdown Timer -->
+            <div id="round-timer" class="pixel-box-dark timer-badge" style="display: none;">TIME: 3</div>
             
             <div id="battle-status-msg" class="battle-message">READY PLAYER ONE!</div>
           </div>
@@ -309,16 +357,36 @@
         </div>
 
         <!-- CONSOLE BATTLE LOG -->
-        <div class="console-log-container pixel-box-dark">
-          <div class="console-header">
-            <span class="console-dot red"></span>
-            <span class="console-dot yellow"></span>
-            <span class="console-dot green"></span>
-            <span class="console-title">BATTLE CONSOLE</span>
+        <div class="console-log-container pixel-box-dark" style="display: flex; flex-direction: column;">
+          <div class="console-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 2px solid var(--border-black); margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="console-dot red"></span>
+              <span class="console-dot yellow"></span>
+              <span class="console-dot green"></span>
+              <span class="console-title">BATTLE CONSOLE</span>
+            </div>
+            <!-- Tabs -->
+            <div class="console-tabs" style="display: flex; gap: 4px;">
+              <button id="tab-btn-log" class="pixel-btn-tab active">LOG</button>
+              <button id="tab-btn-chat" class="pixel-btn-tab">CHAT</button>
+            </div>
           </div>
+          
+          <!-- Battle Logs Window -->
           <div class="console-lines" id="console-output">
             <div class="console-line text-yellow">[SYSTEM]: Arena initialized. Welcome to Voxel Showdown.</div>
             <div class="console-line text-white">[SYSTEM]: Select a weapon to commence battle!</div>
+          </div>
+
+          <!-- Chat Window -->
+          <div class="console-lines" id="chat-output" style="display: none;">
+            <div class="console-line text-cyan">[SYSTEM]: Chat room initialized. Say hello to your enemy!</div>
+          </div>
+
+          <!-- Chat Input Row -->
+          <div id="console-chat-input-row" style="display: none; border-top: 2px solid var(--border-black); padding-top: 6px; margin-top: 6px; align-items: stretch;">
+            <input type="text" id="console-chat-input" class="pixel-input" placeholder="Type message..." style="flex-grow: 1; margin-right: 8px; font-size: 10px; padding: 6px;">
+            <button id="console-chat-send" class="pixel-btn-small" style="padding: 6px 12px; font-size: 9px; font-weight: bold;">SEND</button>
           </div>
         </div>
       </section>
@@ -363,6 +431,7 @@
     </footer>
   </div>
 
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

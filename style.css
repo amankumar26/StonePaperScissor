@@ -1191,3 +1191,115 @@ body {
     height: 36px;
   }
 }
+
+/* Multiplayer Lobby Custom Styles */
+.pixel-input {
+  background-color: #111115 !important;
+  border: 4px solid var(--border-black) !important;
+  color: #ffffff !important;
+  font-family: var(--font-pixel-sub);
+  font-size: 11px;
+  padding: 8px 12px;
+  box-shadow: 
+    inset 2px 2px 0px 0px rgba(0,0,0,0.8),
+    inset -2px -2px 0px 0px rgba(255,255,255,0.05);
+  outline: none;
+  image-rendering: pixelated;
+}
+
+.pixel-input:focus {
+  border-color: var(--color-cyan) !important;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border-black);
+}
+.status-dot.red { background-color: var(--color-red); }
+.status-dot.yellow { background-color: var(--color-gold); }
+.status-dot.green { background-color: var(--color-green); }
+
+.status-dot.pulse {
+  animation: dotPulse 1s infinite alternate;
+}
+
+@keyframes dotPulse {
+  0% { opacity: 0.4; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1.1); }
+}
+
+.invite-link-row {
+  display: flex;
+  align-items: stretch;
+  margin-top: 4px;
+}
+
+/* Timer Badge Style */
+.timer-badge {
+  font-family: var(--font-pixel-sub);
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--color-gold);
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  border: 3px solid var(--border-black) !important;
+  padding: 6px 16px;
+  margin-top: 14px;
+  text-shadow: 2px 2px 0px #000;
+  image-rendering: pixelated;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.timer-badge.warning {
+  color: var(--color-red) !important;
+  border-color: var(--color-red) !important;
+  animation: timerAlert 0.4s infinite alternate;
+}
+
+@keyframes timerAlert {
+  0% { transform: scale(1); filter: brightness(1.2); }
+  100% { transform: scale(1.1); filter: brightness(0.8); }
+}
+
+/* Console Tab Buttons Style */
+.pixel-btn-tab {
+  background-color: #4b5563;
+  border: 2px solid var(--border-black);
+  color: #94a3b8;
+  font-family: var(--font-pixel-sub);
+  font-size: 8px;
+  padding: 4px 8px;
+  box-shadow: 
+    inset -2px -2px 0px 0px #374151,
+    inset 2px 2px 0px 0px #6b7280;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+.pixel-btn-tab:hover {
+  color: #fff;
+  background-color: #6b7280;
+}
+
+.pixel-btn-tab.active {
+  background-color: var(--color-cyan);
+  color: #000;
+  box-shadow: 
+    inset -2px -2px 0px 0px #0891b2,
+    inset 2px 2px 0px 0px #a5f3fc;
+}
+
+/* Timer toggle button active/disabled styles */
+#timer-toggle-btn.disabled {
+  opacity: 0.5;
+}
+#timer-toggle-btn.disabled svg {
+  color: var(--color-red);
+}
+
+
+
+
