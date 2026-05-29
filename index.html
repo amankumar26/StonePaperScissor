@@ -37,6 +37,17 @@
           </svg>
         </button>
 
+        <!-- Rules Button and Dynamic Dropdown -->
+        <button id="rules-btn" class="pixel-btn-small" aria-label="Show rules" title="Show Rules" style="position: relative;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+          </svg>
+          <div id="rules-dropdown" class="pixel-box-dark" style="display: none; position: absolute; top: 36px; right: 0; width: 200px; z-index: 100; text-align: left; padding: 12px; font-family: var(--font-pixel-sub); font-size: 9px; line-height: 1.4; color: #fff; border: 2px solid var(--border-black); background: rgba(17, 24, 39, 0.95); box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+            <h4 class="pixel-text-gold" style="margin: 0 0 8px 0; font-family: var(--font-pixel); font-size: 9px; text-transform: uppercase;">ACTIVE RULES</h4>
+            <div id="rules-content">Select a game mode.</div>
+          </div>
+        </button>
+
         <button id="mute-btn" class="pixel-btn-small" aria-label="Mute sound" title="Toggle Sound">
           <svg class="audio-icon" viewBox="0 0 24 24" width="18" height="18">
             <path id="audio-path" fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>

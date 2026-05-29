@@ -369,6 +369,8 @@ const muteBtn = document.getElementById('mute-btn');
 const audioPath = document.getElementById('audio-path');
 const multiplayerPedestalsContainer = document.getElementById('multiplayer-pedestals-container');
 const playerLimitBtns = document.querySelectorAll('.player-limit-btn');
+const rulesBtn = document.getElementById('rules-btn');
+const rulesDropdown = document.getElementById('rules-dropdown');
 
 const skinCards = document.querySelectorAll('.skin-card');
 const modeEndless = document.getElementById('mode-endless');
@@ -432,6 +434,7 @@ modeEndless.addEventListener('click', () => {
   playBtn.removeAttribute('disabled');
   playBtn.textContent = 'START BATTLE';
   playClickSound();
+  updateRulesContent();
 });
 
 modeMatch.addEventListener('click', () => {
@@ -445,6 +448,7 @@ modeMatch.addEventListener('click', () => {
   playBtn.removeAttribute('disabled');
   playBtn.textContent = 'START BATTLE';
   playClickSound();
+  updateRulesContent();
 });
 
 modeVersus.addEventListener('click', () => {
@@ -551,6 +555,7 @@ function switchScreen(screenName) {
   } else if (screenName === 'gameover') {
     screenGameOver.classList.add('active');
   }
+  updateRulesContent();
 }
 
 // 9. RENDER BLOCKY AVATAR COMPONENT
@@ -1916,6 +1921,8 @@ function checkVersusGameStatus() {
     }
   }
 
+  updateRulesContent();
+
   setTimeout(() => {
     if (alivePlayers.length === 1) {
       endVersusGame(alivePlayers[0]);
@@ -2300,6 +2307,93 @@ if (timerToggleBtn) {
     }
   });
 }
+
+// Rules Button Event Handler
+if (rulesBtn && rulesDropdown) {
+  rulesBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isVisible = rulesDropdown.style.display === 'block';
+    rulesDropdown.style.display = isVisible ? 'none' : 'block';
+    playClickSound();
+  });
+
+  document.addEventListener('click', () => {
+    rulesDropdown.style.display = 'none';
+  });
+  
+  rulesDropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+}
+
+function updateRulesContent() {
+  const rulesContent = document.getElementById('rules-content');
+  if (!rulesContent) return;
+
+  if (gameState.screen === 'battle' && gameState.mode === 'versus') {
+    let aliveCount = 0;
+    for (let pId in gameState.players) {
+      if (gameState.players[pId].hp > 0) {
+        aliveCount++;
+      }
+    }
+
+    if (aliveCount === 4) {
+      rulesContent.innerHTML = `
+        <span class="text-cyan" style="font-weight:bold;">[4-PLAYER MATCH]</span><br>
+        • 4 players active.<br>
+        • Choose Stone/Paper/Scissors.<br>
+        • If 3 weapons or all same ➡️ Draw.<br>
+        • If 2 weapons ➡️ Winner hits losers.<br>
+        • Timeouts deal 1 HP loss.
+      `;
+    } else if (aliveCount === 3) {
+      rulesContent.innerHTML = `
+        <span class="text-cyan" style="font-weight:bold;">[3-PLAYER MATCH]</span><br>
+        • 3 players active (1 down!).<br>
+        • Choose Stone/Paper/Scissors.<br>
+        • If 3 weapons or all same ➡️ Draw.<br>
+        • If 2 weapons ➡️ Winner hits losers.<br>
+        • Timeouts deal 1 HP loss.
+      `;
+    } else if (aliveCount === 2) {
+      rulesContent.innerHTML = `
+        <span class="text-cyan" style="font-weight:bold;">[2-PLAYER DUEL]</span><br>
+        • 2 players active (2 down!).<br>
+        • Classic 1v1 rules.<br>
+        • Winner deals 1 damage.<br>
+        • Timeouts deal 1 HP loss.
+      `;
+    } else {
+      rulesContent.innerHTML = `
+        <span class="text-green" style="font-weight:bold;">[MATCH RESOLVED]</span><br>
+        Match finished.
+      `;
+    }
+  } else if (gameState.mode === 'match') {
+    rulesContent.innerHTML = `
+      <span class="text-yellow" style="font-weight:bold;">[MATCH PLAY]</span><br>
+      • Defeat the boss to win.<br>
+      • Single boss fight per run.<br>
+      • Game ends win/lose.<br>
+      • Progresses to next stage.
+    `;
+  } else if (gameState.mode === 'endless') {
+    rulesContent.innerHTML = `
+      <span class="text-green" style="font-weight:bold;">[ENDLESS SURVIVAL]</span><br>
+      • Fight endless random bosses.<br>
+      • Lose 3 hearts ➡️ Game Over.<br>
+      • Accumulate score & streaks.<br>
+      • Timer can be toggled off.
+    `;
+  } else {
+    rulesContent.innerHTML = `Select a game mode.`;
+  }
+}
+
+// Initial update on load
+updateRulesContent();
+
 
 
 
