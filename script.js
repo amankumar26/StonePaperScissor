@@ -107,15 +107,15 @@ const gameState = {
   
   // P2P Multiplayer state
   peer: null,
-  conn: null,
+  conn: null, // Host connection for clients
+  connections: [], // Array of client connections for the host
+  players: {}, // Map of all players: { 1: { skin, choice, hp, name, isAlive, rematchReady }, ... }
+  playerIndex: 1, // Self player index (1 is host, 2/3/4 are clients)
+  maxPlayers: 2, // Max players in lobby (2, 3, or 4)
   isHost: false,
   peerId: null,
-  opponentSkin: 'steve',
-  opponentChoice: null,
   localChoice: null,
-  opponentConnected: false,
-  localRematchReady: false,
-  opponentRematchReady: false
+  localRematchReady: false
 };
 
 // 4. AUDIO SYNTH ENGINE (WEB AUDIO API)
@@ -367,6 +367,8 @@ const restartBtn = document.getElementById('restart-btn');
 const menuBtn = document.getElementById('menu-btn');
 const muteBtn = document.getElementById('mute-btn');
 const audioPath = document.getElementById('audio-path');
+const multiplayerPedestalsContainer = document.getElementById('multiplayer-pedestals-container');
+const playerLimitBtns = document.querySelectorAll('.player-limit-btn');
 
 const skinCards = document.querySelectorAll('.skin-card');
 const modeEndless = document.getElementById('mode-endless');
@@ -450,6 +452,18 @@ modeVersus.addEventListener('click', () => {
   playClickSound();
 });
 
+playerLimitBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (gameState.peer && (gameState.peerId || gameState.connections.length > 0)) {
+      return;
+    }
+    playerLimitBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    gameState.maxPlayers = parseInt(btn.dataset.limit, 10);
+    playClickSound();
+  });
+});
+
 // Audio mute button toggle
 muteBtn.addEventListener('click', () => {
   gameState.isMuted = !gameState.isMuted;
@@ -484,13 +498,20 @@ restartBtn.addEventListener('click', () => {
     if (gameState.localRematchReady) return;
     gameState.localRematchReady = true;
     restartBtn.setAttribute('disabled', 'true');
-    restartBtn.textContent = 'WAITING FOR FRIEND...';
+    restartBtn.textContent = 'WAITING FOR PLAYERS...';
     sendPeerMessage({ type: 'rematch' });
     
-    if (gameState.opponentRematchReady) {
-      restartBtn.removeAttribute('disabled');
-      restartBtn.textContent = 'REMATCH';
-      startVersusBattle();
+    if (gameState.isHost) {
+      gameState.players[1].rematchReady = true;
+      let allReady = true;
+      for (let pId in gameState.players) {
+        if (!gameState.players[pId].rematchReady) {
+          allReady = false;
+        }
+      }
+      if (allReady) {
+        startVersusBattle();
+      }
     }
   } else {
     restartBtn.textContent = 'RESPAWN';
@@ -572,6 +593,13 @@ function renderHearts(container, currentHP, maxHP) {
 function startGame() {
   restartBtn.removeAttribute('disabled');
   restartBtn.textContent = 'RESPAWN';
+
+  // Restore static pedestals and visualizers for singleplayer modes
+  playerFighter.style.display = 'flex';
+  enemyFighter.style.display = 'flex';
+  document.querySelector('.choice-visualizer').style.display = 'flex';
+  document.querySelector('.battle-stage').classList.remove('multiplayer');
+  multiplayerPedestalsContainer.style.display = 'none';
 
   if (gameState.mode === 'versus') {
     startVersusBattle();
@@ -1077,21 +1105,43 @@ function selectVersusMode() {
   modeMatch.classList.remove('active');
   modeVersus.classList.add('active');
   gameState.mode = 'versus';
-  modeDesc.textContent = "Play with a friend online! Secretly choose weapons and battle in real-time.";
+  modeDesc.textContent = "Play with friends online! Secretly choose weapons and battle in real-time.";
   
   // Show multiplayer panel
   document.getElementById('multiplayer-panel').style.display = 'block';
   
-  // Update play button state
-  if (gameState.opponentConnected) {
+  // Initialize players structure if not yet done
+  if (!gameState.players[1]) {
+    gameState.players = {
+      1: { skin: gameState.skin, choice: null, hp: 3, name: 'YOU (HOST)', isAlive: true, rematchReady: false }
+    };
+  }
+  
+  updateLobbyUI();
+}
+
+function updateLobbyUI() {
+  if (gameState.mode !== 'versus') return;
+
+  const connectedCount = Object.keys(gameState.players).length;
+  const isFull = connectedCount === gameState.maxPlayers;
+
+  if (gameState.peer && (gameState.peerId || gameState.conn)) {
+    updateLobbyStatus(`CONNECTED! (${connectedCount}/${gameState.maxPlayers})`, 'green');
     if (gameState.isHost) {
-      playBtn.removeAttribute('disabled');
-      playBtn.textContent = 'START BATTLE';
+      if (isFull) {
+        playBtn.removeAttribute('disabled');
+        playBtn.textContent = 'START BATTLE';
+      } else {
+        playBtn.setAttribute('disabled', 'true');
+        playBtn.textContent = `WAITING FOR PLAYERS (${connectedCount}/${gameState.maxPlayers})...`;
+      }
     } else {
       playBtn.setAttribute('disabled', 'true');
-      playBtn.textContent = 'WAITING FOR HOST...';
+      playBtn.textContent = `WAITING FOR HOST (${connectedCount}/${gameState.maxPlayers})...`;
     }
   } else {
+    updateLobbyStatus('DISCONNECTED', 'red');
     playBtn.setAttribute('disabled', 'true');
     playBtn.textContent = 'CONNECT A FRIEND TO BATTLE';
   }
@@ -1109,8 +1159,13 @@ function initPeer() {
 
     gameState.peer.on('open', (id) => {
       gameState.peerId = id;
+      gameState.isHost = true;
+      gameState.playerIndex = 1;
+      gameState.players = {
+        1: { skin: gameState.skin, choice: null, hp: 3, name: 'YOU (HOST)', isAlive: true, rematchReady: false }
+      };
+      
       console.log('PeerJS initialized with ID:', id);
-      updateLobbyStatus('WAITING FOR FRIEND...', 'yellow');
       
       // Generate and display invite link
       const inviteLink = window.location.origin + window.location.pathname + '?join=' + id;
@@ -1119,16 +1174,19 @@ function initPeer() {
       
       // Auto fill Lobby Code input for helper
       document.getElementById('lobby-code-input').placeholder = id;
-      printLog('[MULTIPLAYER]: Lobby created! Share the invite link with a friend.', 'text-yellow');
+      printLog('[MULTIPLAYER]: Lobby created! Share the invite link with friends.', 'text-yellow');
+      
+      updateLobbyUI();
     });
 
     gameState.peer.on('connection', (conn) => {
-      if (gameState.conn) {
-        // Reject extra connections
-        conn.close();
+      if (gameState.connections.length + 1 >= gameState.maxPlayers) {
+        conn.on('open', () => {
+          conn.send({ type: 'rejected', reason: 'Lobby is full!' });
+          setTimeout(() => conn.close(), 500);
+        });
         return;
       }
-      gameState.isHost = true;
       setupConnection(conn);
     });
 
@@ -1196,118 +1254,286 @@ function connectToHost(hostId) {
 }
 
 function setupConnection(conn) {
-  gameState.conn = conn;
-  
-  conn.on('open', () => {
-    console.log('Connected to peer successfully!');
-    gameState.opponentConnected = true;
-    updateLobbyStatus('CONNECTED!', 'green');
-    playClickSound();
+  if (gameState.isHost) {
+    gameState.connections.push(conn);
+    const clientIndex = gameState.connections.length + 1;
+    
+    gameState.players[clientIndex] = {
+      skin: 'steve',
+      choice: null,
+      hp: 3,
+      name: `PLAYER ${clientIndex}`,
+      isAlive: true,
+      rematchReady: false
+    };
 
-    if (gameState.isHost) {
-      playBtn.removeAttribute('disabled');
-      playBtn.textContent = 'START BATTLE';
-      printLog('[MULTIPLAYER]: Friend joined! Ready to fight.', 'text-green');
-      // Send host skin to guest
-      sendPeerMessage({ type: 'skin', skin: gameState.skin });
-    } else {
-      playBtn.setAttribute('disabled', 'true');
-      playBtn.textContent = 'WAITING FOR HOST...';
-      printLog('[MULTIPLAYER]: Connected to host lobby! Waiting for host to start.', 'text-green');
-      // Send guest skin to host
-      sendPeerMessage({ type: 'skin', skin: gameState.skin });
-    }
-  });
+    conn.on('open', () => {
+      console.log(`Connected client ${clientIndex} successfully!`);
+      playClickSound();
+      printLog(`[MULTIPLAYER]: Player ${clientIndex} joined!`, 'text-green');
+
+      // Initialize client state
+      conn.send({
+        type: 'init',
+        playerIndex: clientIndex,
+        maxPlayers: gameState.maxPlayers,
+        players: gameState.players
+      });
+
+      // Broadcast new player updates
+      broadcast({
+        type: 'players_update',
+        players: gameState.players
+      });
+      
+      updateLobbyUI();
+    });
+  } else {
+    gameState.conn = conn;
+
+    conn.on('open', () => {
+      console.log('Connected to host successfully!');
+      playClickSound();
+      printLog('[MULTIPLAYER]: Connected to host lobby! Synchronizing...', 'text-green');
+
+      // Send local skin to host
+      conn.send({ type: 'skin', skin: gameState.skin });
+    });
+  }
 
   conn.on('data', (data) => {
-    handlePeerMessage(data);
+    handlePeerMessage(data, conn);
   });
 
   conn.on('close', () => {
-    printLog('[MULTIPLAYER]: Opponent disconnected.', 'text-red');
-    handlePeerDisconnect();
+    handlePeerDisconnect(conn);
   });
 
   conn.on('error', (err) => {
     console.error('Connection channel error:', err);
-    handlePeerDisconnect();
+    handlePeerDisconnect(conn);
   });
 }
 
-function sendPeerMessage(msg) {
-  if (gameState.conn && gameState.conn.open) {
-    gameState.conn.send(msg);
+function getPlayerIndexByConn(conn) {
+  for (let i = 0; i < gameState.connections.length; i++) {
+    if (gameState.connections[i] === conn) {
+      return i + 2;
+    }
+  }
+  return null;
+}
+
+function broadcast(msg) {
+  if (gameState.isHost) {
+    gameState.connections.forEach(c => {
+      if (c.open) {
+        c.send(msg);
+      }
+    });
   }
 }
 
-function handlePeerMessage(data) {
+function sendPeerMessage(msg) {
+  if (gameState.isHost) {
+    broadcast(msg);
+  } else {
+    if (gameState.conn && gameState.conn.open) {
+      gameState.conn.send(msg);
+    }
+  }
+}
+
+function handlePeerMessage(data, conn) {
+  const senderIndex = gameState.isHost ? getPlayerIndexByConn(conn) : 1;
+
   switch (data.type) {
+    case 'rejected':
+      printLog(`[MULTIPLAYER]: Rejected from lobby. Reason: ${data.reason}`, 'text-red');
+      updateLobbyStatus('LOBBY FULL', 'red');
+      break;
+
+    case 'init':
+      gameState.playerIndex = data.playerIndex;
+      gameState.maxPlayers = data.maxPlayers;
+      gameState.players = data.players;
+      printLog(`[MULTIPLAYER]: You entered the lobby as PLAYER ${data.playerIndex}`, 'text-yellow');
+      
+      sendPeerMessage({ type: 'skin', skin: gameState.skin });
+      updateLobbyUI();
+      break;
+
+    case 'players_update':
+      gameState.players = data.players;
+      if (!gameState.isHost) {
+        sendPeerMessage({ type: 'skin', skin: gameState.skin });
+      }
+      updateLobbyUI();
+      break;
+
     case 'skin':
-      gameState.opponentSkin = data.skin;
-      printLog(`[MULTIPLAYER]: Opponent chose skin: ${data.skin.toUpperCase()}`, 'text-cyan');
-      if (gameState.screen === 'battle') {
-        const currentOpponentClass = SKINS[gameState.opponentSkin].skinClass;
-        renderFullBody(currentOpponentClass, enemyAvatar3D);
-        document.querySelector('.hud-avatar.enemy').innerHTML = SKINS[gameState.opponentSkin].headSvg;
-        hudEnemyName.textContent = "OPPONENT (" + gameState.opponentSkin.toUpperCase() + ")";
+      if (gameState.isHost && senderIndex) {
+        gameState.players[senderIndex].skin = data.skin;
+        gameState.players[senderIndex].name = `PLAYER ${senderIndex} (${data.skin.toUpperCase()})`;
+        printLog(`[MULTIPLAYER]: Player ${senderIndex} chose skin: ${data.skin.toUpperCase()}`, 'text-cyan');
+        
+        broadcast({
+          type: 'players_update',
+          players: gameState.players
+        });
+        
+        updateLobbyUI();
       }
       break;
 
     case 'start':
+      gameState.players = data.players;
       startVersusBattle();
       break;
 
     case 'choice':
-      gameState.opponentChoice = data.choice;
-      printLog('[MULTIPLAYER]: Opponent locked their move!', 'text-cyan');
-      if (gameState.localChoice) {
-        stopRoundTimer();
-        resolveVersusRound();
-      } else {
-        startRoundTimer();
+      if (gameState.isHost && senderIndex) {
+        gameState.players[senderIndex].choice = data.choice;
+        printLog(`[MULTIPLAYER]: Player ${senderIndex} locked their move!`, 'text-cyan');
+        
+        let allChosen = true;
+        for (let pId in gameState.players) {
+          if (gameState.players[pId].isAlive && !gameState.players[pId].choice) {
+            allChosen = false;
+          }
+        }
+
+        if (allChosen) {
+          stopRoundTimer();
+          resolveVersusRound();
+        } else {
+          if (!timerInterval) {
+            startRoundTimer();
+          }
+        }
       }
       break;
 
+    case 'resolve':
+      resolveVersusRoundFinal(data.choices, data.results, data.hpChanges, data.roundDraw);
+      break;
+
     case 'rematch':
-      printLog('[MULTIPLAYER]: Opponent is ready for a rematch!', 'text-yellow');
-      gameState.opponentRematchReady = true;
-      if (gameState.localRematchReady) {
-        startVersusBattle();
+      if (gameState.isHost && senderIndex) {
+        gameState.players[senderIndex].rematchReady = true;
+        printLog(`[MULTIPLAYER]: Player ${senderIndex} voted for Rematch!`, 'text-yellow');
+        
+        let allReady = true;
+        for (let pId in gameState.players) {
+          if (!gameState.players[pId].rematchReady) {
+            allReady = false;
+          }
+        }
+
+        if (allReady) {
+          startVersusBattle();
+        }
       }
       break;
 
     case 'chat':
-      const oppName = (gameState.opponentSkin || 'steve').toUpperCase();
-      printChatLog(oppName, data.message, 'text-yellow');
-      playClickSound();
-      const chatTab = document.getElementById('tab-btn-chat');
-      if (chatTab && !chatTab.classList.contains('active')) {
-        chatTab.style.borderColor = 'var(--color-red)';
-        chatTab.textContent = 'CHAT 🔴';
+      if (gameState.isHost && senderIndex) {
+        broadcast({
+          type: 'chat',
+          message: data.message,
+          senderIndex: senderIndex
+        });
+        
+        const skinName = (gameState.players[senderIndex].skin || 'steve').toUpperCase();
+        printChatLog(`${skinName} (P${senderIndex})`, data.message, 'text-yellow');
+        playClickSound();
+        triggerChatTabNotification();
+      } else if (!gameState.isHost) {
+        const sender = gameState.players[data.senderIndex];
+        if (sender) {
+          const skinName = (sender.skin || 'steve').toUpperCase();
+          printChatLog(`${skinName} (P${data.senderIndex})`, data.message, 'text-yellow');
+          playClickSound();
+          triggerChatTabNotification();
+        }
       }
       break;
   }
 }
 
-function handlePeerDisconnect() {
-  gameState.opponentConnected = false;
-  gameState.conn = null;
-  
-  if (gameState.screen === 'battle') {
-    printLog('[SYSTEM]: Opponent disconnected. Ending match...', 'text-red');
-    battleStatusMsg.textContent = 'FRIEND DISCONNECTED';
-    clashText.textContent = 'LOST';
-    clashText.className = 'clash-effect text-red';
-    gameState.isLocked = true;
+function triggerChatTabNotification() {
+  const chatTab = document.getElementById('tab-btn-chat');
+  if (chatTab && !chatTab.classList.contains('active')) {
+    chatTab.style.borderColor = 'var(--color-red)';
+    chatTab.textContent = 'CHAT 🔴';
+  }
+}
+
+function handlePeerDisconnect(closedConn) {
+  if (gameState.isHost) {
+    const senderIndex = getPlayerIndexByConn(closedConn);
+    printLog(`[MULTIPLAYER]: Player ${senderIndex || ''} disconnected.`, 'text-red');
     
-    setTimeout(() => {
-      switchScreen('splash');
+    gameState.connections = gameState.connections.filter(c => c !== closedConn);
+    
+    if (gameState.screen === 'battle') {
+      battleStatusMsg.textContent = 'OPPONENT DISCONNECTED';
+      clashText.textContent = 'ABORT';
+      clashText.className = 'clash-effect text-red';
+      gameState.isLocked = true;
+      stopRoundTimer();
+      
+      gameState.connections.forEach(c => c.close());
+      gameState.connections = [];
+      gameState.players = {};
+      
+      setTimeout(() => {
+        switchScreen('splash');
+        updateLobbyStatus('DISCONNECTED', 'red');
+        selectVersusMode();
+      }, 2000);
+    } else {
+      const newPlayers = {
+        1: { skin: gameState.skin, choice: null, hp: 3, name: 'YOU (HOST)', isAlive: true, rematchReady: false }
+      };
+      
+      gameState.connections.forEach((c, idx) => {
+        const newIdx = idx + 2;
+        newPlayers[newIdx] = {
+          skin: 'steve',
+          choice: null,
+          hp: 3,
+          name: `PLAYER ${newIdx}`,
+          isAlive: true,
+          rematchReady: false
+        };
+      });
+      gameState.players = newPlayers;
+      
+      broadcast({ type: 'players_update', players: gameState.players });
+      updateLobbyUI();
+    }
+  } else {
+    printLog('[MULTIPLAYER]: Disconnected from host lobby.', 'text-red');
+    gameState.conn = null;
+    gameState.players = {};
+    
+    if (gameState.screen === 'battle') {
+      battleStatusMsg.textContent = 'HOST DISCONNECTED';
+      clashText.textContent = 'ABORT';
+      clashText.className = 'clash-effect text-red';
+      gameState.isLocked = true;
+      stopRoundTimer();
+      
+      setTimeout(() => {
+        switchScreen('splash');
+        updateLobbyStatus('DISCONNECTED', 'red');
+        selectVersusMode();
+      }, 2000);
+    } else {
       updateLobbyStatus('DISCONNECTED', 'red');
       selectVersusMode();
-    }, 2000);
-  } else {
-    updateLobbyStatus('DISCONNECTED', 'red');
-    selectVersusMode();
+    }
   }
 }
 
@@ -1332,52 +1558,80 @@ function startVersusBattle() {
   gameState.streak = 0;
   gameState.maxStreak = 0;
   gameState.roundsPlayed = 0;
-  gameState.playerHP = 3;
-  gameState.enemyHP = 3;
   gameState.isLocked = false;
   gameState.localChoice = null;
-  gameState.opponentChoice = null;
   gameState.localRematchReady = false;
-  gameState.opponentRematchReady = false;
+
+  for (let pId in gameState.players) {
+    gameState.players[pId].hp = 3;
+    gameState.players[pId].isAlive = true;
+    gameState.players[pId].choice = null;
+    gameState.players[pId].rematchReady = false;
+  }
 
   restartBtn.removeAttribute('disabled');
   restartBtn.textContent = 'REMATCH';
 
   if (gameState.isHost) {
-    sendPeerMessage({ type: 'start' });
+    broadcast({ type: 'start', players: gameState.players });
   }
 
-  // Set up player skin SVG in HUD
-  const activeSkinCard = document.querySelector('.skin-card.active');
-  hudPlayerAvatar.innerHTML = activeSkinCard.querySelector('.skin-avatar').innerHTML;
-  hudPlayerName.textContent = "YOU (" + gameState.skin.toUpperCase() + ")";
+  playerFighter.style.display = 'none';
+  enemyFighter.style.display = 'none';
+  document.querySelector('.choice-visualizer').style.display = 'none';
 
-  // Set up opponent skin SVG in HUD
-  const oppSkin = gameState.opponentSkin || 'steve';
-  document.querySelector('.hud-avatar.enemy').innerHTML = SKINS[oppSkin].headSvg;
-  hudEnemyName.textContent = "OPPONENT (" + oppSkin.toUpperCase() + ")";
+  multiplayerPedestalsContainer.innerHTML = '';
+  multiplayerPedestalsContainer.style.display = 'flex';
 
-  // Render blocky avatars on pedestals
-  renderFullBody(gameState.skin, playerAvatar3D);
-  renderFullBody(SKINS[oppSkin].skinClass, enemyAvatar3D);
+  for (let pId in gameState.players) {
+    const player = gameState.players[pId];
+    const isSelf = pId == gameState.playerIndex;
+    const nameLabel = isSelf ? `YOU (P${pId})` : `PLAYER ${pId}`;
 
-  // Update HUD elements
-  hudScore.textContent = '0';
-  hudStreak.textContent = '0';
-  renderHearts(playerHeartsContainer, gameState.playerHP, gameState.maxHP);
-  renderHearts(enemyHeartsContainer, gameState.enemyHP, gameState.maxHP);
+    const pedestalContainer = document.createElement('div');
+    pedestalContainer.className = 'pedestal-container';
+    pedestalContainer.id = `pedestal-player-${pId}`;
+    
+    const choiceBubble = document.createElement('div');
+    choiceBubble.className = 'choice-bubble';
+    choiceBubble.id = `choice-bubble-${pId}`;
+    pedestalContainer.appendChild(choiceBubble);
 
-  // Clear battle visualizer and console logs
-  playerChoiceDisplay.classList.remove('active');
-  enemyChoiceDisplay.classList.remove('active');
-  playerChoiceDisplay.innerHTML = '';
-  enemyChoiceDisplay.innerHTML = '';
+    const avatarBlocky = document.createElement('div');
+    avatarBlocky.className = 'avatar-blocky';
+    avatarBlocky.id = `player-avatar-3d-${pId}`;
+    pedestalContainer.appendChild(avatarBlocky);
+
+    const pedestalBase = document.createElement('div');
+    pedestalBase.className = 'pedestal pixel-box-dark';
+    pedestalContainer.appendChild(pedestalBase);
+
+    const nameTag = document.createElement('div');
+    nameTag.className = 'name-tag';
+    nameTag.textContent = nameLabel;
+    pedestalContainer.appendChild(nameTag);
+
+    const heartsContainer = document.createElement('div');
+    heartsContainer.className = 'hearts-container';
+    heartsContainer.id = `player-hearts-${pId}`;
+    pedestalContainer.appendChild(heartsContainer);
+
+    multiplayerPedestalsContainer.appendChild(pedestalContainer);
+
+    const skinClass = SKINS[player.skin].skinClass;
+    renderFullBody(skinClass, avatarBlocky);
+
+    renderHearts(heartsContainer, player.hp, 3);
+  }
+
+  document.querySelector('.battle-stage').classList.add('multiplayer');
+
   clashText.textContent = 'VS';
   battleStatusMsg.textContent = 'CHOOSE WEAPON...';
 
   consoleOutput.innerHTML = `
-    <div class="console-line text-yellow">[SYSTEM]: Online Versus match started!</div>
-    <div class="console-line text-white">[SYSTEM]: You face ${hudEnemyName.textContent}! Select your weapon.</div>
+    <div class="console-line text-yellow">[SYSTEM]: Online Versus match started! Max Players: ${gameState.maxPlayers}</div>
+    <div class="console-line text-white">[SYSTEM]: Select your weapon. Protect your 3 hearts!</div>
   `;
   scrollConsole();
 
@@ -1389,183 +1643,228 @@ function startVersusBattle() {
 function resolveVersusRound() {
   gameState.roundsPlayed++;
   
-  // Clear displays
-  playerChoiceDisplay.classList.remove('active');
-  enemyChoiceDisplay.classList.remove('active');
+  const choices = {};
+  const activePlayers = [];
+  
+  for (let pId in gameState.players) {
+    if (gameState.players[pId].isAlive) {
+      choices[pId] = gameState.players[pId].choice || 'timeout';
+      activePlayers.push(pId);
+    } else {
+      choices[pId] = 'dead';
+    }
+  }
+
+  const hpChanges = {};
+  for (let pId in gameState.players) {
+    hpChanges[pId] = 0;
+  }
+
+  activePlayers.forEach(pId => {
+    if (choices[pId] === 'timeout') {
+      hpChanges[pId] = -1;
+    }
+  });
+
+  const validClashPlayers = activePlayers.filter(pId => choices[pId] !== 'timeout');
+  const validWeapons = validClashPlayers.map(pId => choices[pId]);
+  const uniqueWeapons = [...new Set(validWeapons)];
+
+  let roundDraw = false;
+
+  if (uniqueWeapons.length === 3 || uniqueWeapons.length <= 1) {
+    roundDraw = true;
+  } else {
+    const weaponA = uniqueWeapons[0];
+    const weaponB = uniqueWeapons[1];
+    let winningWeapon = '';
+    let losingWeapon = '';
+
+    if (
+      (weaponA === 'stone' && weaponB === 'scissors') ||
+      (weaponA === 'paper' && weaponB === 'stone') ||
+      (weaponA === 'scissors' && weaponB === 'paper')
+    ) {
+      winningWeapon = weaponA;
+      losingWeapon = weaponB;
+    } else {
+      winningWeapon = weaponB;
+      losingWeapon = weaponA;
+    }
+
+    validClashPlayers.forEach(pId => {
+      if (choices[pId] === losingWeapon) {
+        hpChanges[pId] = -1;
+      }
+    });
+  }
+
+  const results = {};
+  for (let pId in gameState.players) {
+    if (gameState.players[pId].isAlive) {
+      if (choices[pId] === 'timeout') {
+        results[pId] = 'timeout';
+      } else if (roundDraw) {
+        results[pId] = 'draw';
+      } else {
+        const losingWeapon = uniqueWeapons.find(w => (
+          (w === 'stone' && uniqueWeapons.includes('paper')) ||
+          (w === 'paper' && uniqueWeapons.includes('scissors')) ||
+          (w === 'scissors' && uniqueWeapons.includes('stone'))
+        ));
+        const winningW = uniqueWeapons.find(w => w !== losingWeapon);
+        if (choices[pId] === winningW) {
+          results[pId] = 'win';
+        } else {
+          results[pId] = 'lose';
+        }
+      }
+    } else {
+      results[pId] = 'dead';
+    }
+  }
+
+  for (let pId in gameState.players) {
+    if (gameState.players[pId].isAlive) {
+      gameState.players[pId].hp += hpChanges[pId];
+      if (gameState.players[pId].hp <= 0) {
+        gameState.players[pId].hp = 0;
+        gameState.players[pId].isAlive = false;
+      }
+    }
+    gameState.players[pId].choice = null;
+  }
+
+  broadcast({
+    type: 'resolve',
+    choices: choices,
+    results: results,
+    hpChanges: hpChanges,
+    roundDraw: roundDraw
+  });
+
+  resolveVersusRoundFinal(choices, results, hpChanges, roundDraw);
+}
+
+function resolveVersusRoundFinal(choices, results, hpChanges, roundDraw) {
+  gameState.isLocked = true;
   battleStatusMsg.textContent = 'CHOOSING...';
 
-  const playerWeapon = gameState.localChoice;
-  const enemyWeapon = gameState.opponentChoice;
-
-  // Play rolling animation blips
   let tick = 0;
   const weapons = ['stone', 'paper', 'scissors'];
+  
   const rollInterval = setInterval(() => {
     playSelectSound();
 
-    // Quick random visuals during rolling
-    const randPlayer = weapons[Math.floor(Math.random() * 3)];
-    const randEnemy = weapons[Math.floor(Math.random() * 3)];
-
-    playerChoiceDisplay.innerHTML = weaponSvgs[randPlayer];
-    enemyChoiceDisplay.innerHTML = weaponSvgs[randEnemy];
-
-    playerChoiceDisplay.classList.add('active');
-    enemyChoiceDisplay.classList.add('active');
+    for (let pId in gameState.players) {
+      if (gameState.players[pId].isAlive) {
+        const bubble = document.getElementById(`choice-bubble-${pId}`);
+        if (bubble) {
+          const randW = weapons[Math.floor(Math.random() * 3)];
+          bubble.innerHTML = weaponSvgs[randW];
+          bubble.classList.add('active');
+        }
+      }
+    }
 
     tick++;
     if (tick >= 8) {
       clearInterval(rollInterval);
-      resolveVersusRoundFinal(playerWeapon, enemyWeapon);
+      
+      for (let pId in gameState.players) {
+        const bubble = document.getElementById(`choice-bubble-${pId}`);
+        const avatar = document.getElementById(`player-avatar-3d-${pId}`);
+        
+        if (bubble) {
+          const w = choices[pId];
+          if (w === 'timeout') {
+            bubble.innerHTML = '<div style="font-size:24px; line-height:56px;">⏱️</div>';
+          } else if (w === 'dead') {
+            bubble.style.display = 'none';
+          } else {
+            bubble.innerHTML = weaponSvgs[w];
+          }
+          bubble.classList.add('active');
+        }
+
+        if (avatar) {
+          avatar.className = `avatar-blocky skin-${gameState.players[pId].skin}`;
+        }
+      }
+
+      setTimeout(() => {
+        executeMulticlientDamageVisuals(choices, results, hpChanges, roundDraw);
+      }, 300);
     }
   }, 100);
 }
 
-function resolveVersusRoundFinal(playerWeapon, enemyWeapon) {
-  // Update visualizer displays
-  if (playerWeapon === 'timeout') {
-    playerChoiceDisplay.innerHTML = '<div style="font-size:32px; line-height:72px;">⏱️</div>';
-  } else {
-    playerChoiceDisplay.innerHTML = weaponSvgs[playerWeapon];
-  }
-  
-  if (enemyWeapon === 'timeout') {
-    enemyChoiceDisplay.innerHTML = '<div style="font-size:32px; line-height:72px;">⏱️</div>';
-  } else {
-    enemyChoiceDisplay.innerHTML = weaponSvgs[enemyWeapon];
-  }
-
-  // Calculate result
-  let result = 'draw'; // draw, win, lose
-
-  if (playerWeapon === 'timeout' && enemyWeapon === 'timeout') {
-    result = 'draw';
-  } else if (playerWeapon === 'timeout') {
-    result = 'lose';
-  } else if (enemyWeapon === 'timeout') {
-    result = 'win';
-  } else if (playerWeapon === enemyWeapon) {
-    result = 'draw';
-  } else if (
-    (playerWeapon === 'stone' && enemyWeapon === 'scissors') ||
-    (playerWeapon === 'paper' && enemyWeapon === 'stone') ||
-    (playerWeapon === 'scissors' && enemyWeapon === 'paper')
-  ) {
-    result = 'win';
-  } else {
-    result = 'lose';
-  }
-
-  const playerCenter = getElementCenter(playerChoiceDisplay);
-  const enemyCenter = getElementCenter(enemyChoiceDisplay);
-  const clashCenter = {
-    x: (playerCenter.x + enemyCenter.x) / 2,
-    y: (playerCenter.y + enemyCenter.y) / 2
-  };
-
-  const colorMap = {
-    stone: ['#9c9c9c', '#787878', '#545454', '#ef4444'],
-    paper: ['#22c55e', '#4ade80', '#15803d', '#ffffff'],
-    scissors: ['#22d3ee', '#0891b2', '#d1d5db', '#ffffff']
-  };
-  const pPalette = colorMap[playerWeapon] || ['#ef4444', '#b91c1c', '#dc2626', '#4b5563'];
-  const ePalette = colorMap[enemyWeapon] || ['#ef4444', '#b91c1c', '#dc2626', '#4b5563'];
-  const clashPalette = [...pPalette, ...ePalette];
-
-  // Clear previous animation classes
-  playerAvatar3D.className = `avatar-blocky skin-${gameState.skin}`;
-  const oppSkin = gameState.opponentSkin || 'steve';
-  enemyAvatar3D.className = `avatar-blocky skin-${oppSkin}`;
-
-  // Force reflow
-  void playerAvatar3D.offsetWidth;
-  void enemyAvatar3D.offsetWidth;
-
-  if (result === 'draw') {
+function executeMulticlientDamageVisuals(choices, results, hpChanges, roundDraw) {
+  if (roundDraw) {
     playDrawSound();
     battleStatusMsg.textContent = 'ROUND DRAW!';
     clashText.textContent = 'DRAW';
     clashText.className = 'clash-effect text-yellow';
+    
+    printLog('[SYSTEM]: Draw! No damage dealt.', 'text-white');
 
-    if (playerWeapon === 'timeout' && enemyWeapon === 'timeout') {
-      printLog(`Both players timed out! Round is a Draw.`, 'text-white');
-    } else {
-      printLog(`You chose ${playerWeapon.toUpperCase()}. Opponent chose ${enemyWeapon.toUpperCase()}. Round is a Draw.`, 'text-white');
-    }
-
-    spawnParticles(clashCenter.x, clashCenter.y, ['#e2e8f0', '#94a3b8', '#64748b', '#cbd5e1'], 15);
+    const stage = document.querySelector('.battle-stage');
+    const rect = stage.getBoundingClientRect();
+    spawnParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, ['#cbd5e1', '#94a3b8', '#64748b'], 25);
 
     setTimeout(() => {
       resetVersusRoundState();
     }, 1200);
-
-  } else if (result === 'win') {
-    playWinSound();
-    battleStatusMsg.textContent = 'YOU DEALT DAMAGE!';
-    clashText.textContent = 'HIT!';
-    clashText.className = 'clash-effect text-green';
-
-    // Adjust State
-    gameState.score += 100 + (gameState.streak * 20);
-    gameState.streak++;
-    if (gameState.streak > gameState.maxStreak) {
-      gameState.maxStreak = gameState.streak;
-    }
-
-    hudScore.textContent = gameState.score;
-    hudStreak.textContent = gameState.streak;
-
-    playerAvatar3D.classList.add('attacker-left');
-    enemyAvatar3D.classList.add('hit');
-
-    // Opponent loses Heart
-    gameState.enemyHP--;
-    renderHearts(enemyHeartsContainer, gameState.enemyHP, gameState.maxHP);
-
-    if (enemyWeapon === 'timeout') {
-      printLog(`Opponent timed out! You deal damage.`, 'text-green');
-    } else {
-      printLog(`You chose ${playerWeapon.toUpperCase()}. Opponent chose ${enemyWeapon.toUpperCase()}. Opponent takes damage!`, 'text-green');
-    }
-
-    setTimeout(() => {
-      spawnParticles(clashCenter.x, clashCenter.y, clashPalette, 25);
-      const enemyPedCoords = getElementCenter(enemyFighter);
-      spawnParticles(enemyPedCoords.x, enemyPedCoords.y - 40, ['#ef4444', '#b91c1c', '#dc2626', '#f87171'], 30);
-    }, 150);
-
-    setTimeout(() => {
-      checkVersusGameStatus();
-    }, 1300);
-
   } else {
-    playLoseSound();
-    battleStatusMsg.textContent = 'OPPONENT DEALT DAMAGE!';
-    clashText.textContent = 'OOF!';
-    clashText.className = 'clash-effect text-red';
-
-    // Adjust State
-    gameState.streak = 0;
-    hudStreak.textContent = '0';
-
-    enemyAvatar3D.classList.add('attacker-right');
-    playerAvatar3D.classList.add('hit');
-
-    // Player loses Heart
-    gameState.playerHP--;
-    renderHearts(playerHeartsContainer, gameState.playerHP, gameState.maxHP);
-
-    if (playerWeapon === 'timeout') {
-      printLog(`You timed out! Opponent deals damage.`, 'text-red');
+    const localResult = results[gameState.playerIndex];
+    if (localResult === 'win') {
+      playWinSound();
+      battleStatusMsg.textContent = 'YOU WIN ROUND!';
+      clashText.textContent = 'HIT!';
+      clashText.className = 'clash-effect text-green';
+    } else if (localResult === 'lose') {
+      playLoseSound();
+      battleStatusMsg.textContent = 'YOU TAKE DAMAGE!';
+      clashText.textContent = 'OOF!';
+      clashText.className = 'clash-effect text-red';
     } else {
-      printLog(`You chose ${playerWeapon.toUpperCase()}. Opponent chose ${enemyWeapon.toUpperCase()}. You take damage!`, 'text-red');
+      playDrawSound();
+      battleStatusMsg.textContent = 'BATTLE RESOLVED!';
+      clashText.textContent = 'CLASH';
+      clashText.className = 'clash-effect text-cyan';
     }
 
-    setTimeout(() => {
-      spawnParticles(clashCenter.x, clashCenter.y, clashPalette, 25);
-      const playerPedCoords = getElementCenter(playerFighter);
-      spawnParticles(playerPedCoords.x, playerPedCoords.y - 40, ['#ef4444', '#b91c1c', '#dc2626', '#4b5563'], 30);
-    }, 150);
+    for (let pId in gameState.players) {
+      const avatar = document.getElementById(`player-avatar-3d-${pId}`);
+      const heartsContainer = document.getElementById(`player-hearts-${pId}`);
+      const change = hpChanges[pId];
+
+      if (avatar && gameState.players[pId].isAlive) {
+        if (results[pId] === 'win') {
+          avatar.classList.add(pId % 2 === 0 ? 'attacker-right' : 'attacker-left');
+        } else if (results[pId] === 'lose' || choices[pId] === 'timeout') {
+          avatar.classList.add('hit');
+          const pedCoords = getElementCenter(avatar);
+          spawnParticles(pedCoords.x, pedCoords.y - 30, ['#ef4444', '#b91c1c', '#dc2626'], 20);
+        }
+      }
+
+      if (change < 0) {
+        gameState.players[pId].hp += change;
+        if (gameState.players[pId].hp < 0) gameState.players[pId].hp = 0;
+        
+        if (heartsContainer) {
+          renderHearts(heartsContainer, gameState.players[pId].hp, 3);
+        }
+
+        const skinName = gameState.players[pId].skin.toUpperCase();
+        if (choices[pId] === 'timeout') {
+          printLog(`Player ${pId} (${skinName}) timed out and lost 1 Heart!`, 'text-red');
+        } else {
+          printLog(`Player ${pId} (${skinName}) lost 1 Heart!`, 'text-red');
+        }
+      }
+    }
 
     setTimeout(() => {
       checkVersusGameStatus();
@@ -1575,53 +1874,103 @@ function resolveVersusRoundFinal(playerWeapon, enemyWeapon) {
 
 function resetVersusRoundState() {
   gameState.localChoice = null;
-  gameState.opponentChoice = null;
+  gameState.isLocked = false;
   clashText.textContent = 'VS';
   clashText.className = 'clash-effect';
   battleStatusMsg.textContent = 'CHOOSE WEAPON...';
-  gameState.isLocked = false;
-}
 
-function checkVersusGameStatus() {
-  if (gameState.playerHP <= 0) {
-    playerAvatar3D.className = 'avatar-blocky dead';
-    printLog('You have been defeated by your friend!', 'text-red');
-    setTimeout(() => {
-      endVersusGame(false);
-    }, 1000);
-  } else if (gameState.enemyHP <= 0) {
-    enemyAvatar3D.className = 'avatar-blocky dead';
-    printLog('You have defeated your friend!', 'text-green');
-    setTimeout(() => {
-      endVersusGame(true);
-    }, 1000);
-  } else {
-    resetVersusRoundState();
+  for (let pId in gameState.players) {
+    gameState.players[pId].choice = null;
+  }
+
+  for (let pId in gameState.players) {
+    const bubble = document.getElementById(`choice-bubble-${pId}`);
+    if (bubble) {
+      bubble.classList.remove('active');
+    }
   }
 }
 
-function endVersusGame(isVictory) {
+function checkVersusGameStatus() {
+  let alivePlayers = [];
+  
+  for (let pId in gameState.players) {
+    const avatar = document.getElementById(`player-avatar-3d-${pId}`);
+    
+    if (gameState.players[pId].hp <= 0 && gameState.players[pId].isAlive) {
+      gameState.players[pId].isAlive = false;
+      if (avatar) {
+        avatar.className = 'avatar-blocky dead';
+      }
+      printLog(`PLAYER ${pId} has been eliminated!`, 'text-red');
+    }
+
+    if (gameState.players[pId].hp <= 0) {
+      if (avatar && !avatar.classList.contains('dead')) {
+        avatar.className = 'avatar-blocky dead';
+      }
+    }
+
+    if (gameState.players[pId].hp > 0) {
+      alivePlayers.push(pId);
+    }
+  }
+
+  setTimeout(() => {
+    if (alivePlayers.length === 1) {
+      endVersusGame(alivePlayers[0]);
+    } else if (alivePlayers.length === 0) {
+      endVersusGame(null);
+    } else {
+      resetVersusRoundState();
+    }
+  }, 800);
+}
+
+function endVersusGame(winnerIndex) {
   stopRoundTimer();
+  
   statFinalScore.textContent = gameState.score;
   statMaxStreak.textContent = gameState.maxStreak;
   statHighScore.textContent = gameState.highScore;
   statRounds.textContent = gameState.roundsPlayed;
 
-  if (isVictory) {
+  for (let pId in gameState.players) {
+    const bubble = document.getElementById(`choice-bubble-${pId}`);
+    if (bubble) {
+      bubble.classList.remove('active');
+    }
+  }
+
+  for (let pId in gameState.players) {
+    gameState.players[pId].rematchReady = false;
+  }
+  gameState.localRematchReady = false;
+
+  restartBtn.removeAttribute('disabled');
+  restartBtn.textContent = 'REMATCH';
+
+  if (winnerIndex == gameState.playerIndex) {
     gameoverTitle.textContent = "VICTORY!";
     gameoverTitle.className = "pixel-title text-green";
-    gameoverSubtitle.textContent = "YOU DEFEATED YOUR FRIEND";
+    gameoverSubtitle.textContent = "YOU SURVIVED AND WON";
     gameoverSubtitle.className = "pixel-subtitle text-yellow";
     playVictoryFanfare();
+  } else if (winnerIndex === null) {
+    gameoverTitle.textContent = "MUTUAL DRAW";
+    gameoverTitle.className = "pixel-title text-yellow";
+    gameoverSubtitle.textContent = "EVERYONE WAS ELIMINATED";
+    gameoverSubtitle.className = "pixel-subtitle text-white";
+    playLoseSound();
   } else {
     gameoverTitle.textContent = "DEFEAT";
     gameoverTitle.className = "pixel-title text-red";
-    gameoverSubtitle.textContent = "YOUR FRIEND WON THE MATCH";
+    const winnerSkinName = (gameState.players[winnerIndex].skin || '').toUpperCase();
+    gameoverSubtitle.textContent = `PLAYER ${winnerIndex} (${winnerSkinName}) WON THE MATCH`;
     gameoverSubtitle.className = "pixel-subtitle text-white";
     playLoseSound();
   }
 
-  restartBtn.textContent = 'REMATCH';
   switchScreen('gameover');
 }
 
@@ -1813,8 +2162,10 @@ function sendChatMessage() {
   printChatLog('YOU', msg, 'text-cyan');
   
   // Send to peer if online versus mode
-  if (gameState.mode === 'versus' && gameState.conn && gameState.conn.open) {
-    sendPeerMessage({ type: 'chat', message: msg });
+  if (gameState.mode === 'versus') {
+    if (gameState.isHost || (gameState.conn && gameState.conn.open)) {
+      sendPeerMessage({ type: 'chat', message: msg });
+    }
   } else {
     // Singleplayer mode: trigger funny AI chatbot reply!
     triggerAIChatBotReply(msg);

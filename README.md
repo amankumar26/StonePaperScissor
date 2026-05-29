@@ -18,10 +18,17 @@ An epic, retro 8-bit voxel combat arena built with HTML, Vanilla CSS, and JavaSc
 * Mode resets back to Boss 0 when explicitly re-selecting "Match Play" from the menu.
 
 ### 3. Online Versus (P2P Multiplayer)
-* Battle real players in real-time over the internet using WebRTC (powered by PeerJS).
-* **Invite System**: Generate a lobby, copy a shareable invite link, and send it to your friend.
+* Battle 2, 3, or 4 players in real-time over the internet using WebRTC (powered by PeerJS).
+* **Lobby Configuration**: The host can configure the lobby size limit (2, 3, or 4 players). Clients join using the invite link.
+* **Mesh-Free Host Authority**: The host coordinates the lobby state, routes chat messages, and resolves rules, avoiding mesh network lag.
+* **Invite System**: Generate a lobby, copy a shareable invite link, and send it to your friends.
 * **Smart Parsing**: The join box automatically cleans and extracts the lobby code even if users copy-paste the entire URL.
-* **Simultaneous Moves**: Players choose their weapons in secret. The battle animation executes only after both players lock in their moves.
+* **Simultaneous Moves**: Players choose their weapons in secret. The battle animation executes only after all active players lock in their moves.
+* **Simple Multiplayer Rules**:
+  - Timeouts result in auto-damage (1 HP loss).
+  - If all 3 weapons are chosen (Stone, Paper, and Scissors) or if all players choose the same weapon, it is a **Draw** (no damage is dealt).
+  - If only 2 unique weapons are chosen (e.g. Stone vs Scissors), the winning weapon players deal 1 damage to the losing weapon players.
+  - Battle is resolved dynamically with side-by-side player pedestals and floatable choice bubbles. The last player standing wins!
 
 ---
 

@@ -1300,6 +1300,124 @@ body {
   color: var(--color-red);
 }
 
+/* ==========================================================================
+   MULTIPLAYER 3 & 4 PLAYER STYLING
+   ========================================================================== */
+.battle-stage.multiplayer {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: nowrap;
+}
+
+.battle-stage.multiplayer .pedestal-container {
+  flex: 1;
+  max-width: 100px;
+}
+
+.battle-stage.multiplayer .pedestal {
+  width: 100px;
+  height: 24px;
+}
+
+.battle-stage.multiplayer .pedestal::before {
+  width: 100px;
+  height: 6px;
+  top: -6px;
+}
+
+.battle-stage.multiplayer .avatar-blocky {
+  width: 56px;
+  height: 98px;
+}
+
+.battle-stage.multiplayer .char-head {
+  width: 28px;
+  height: 28px;
+}
+
+.battle-stage.multiplayer .char-body {
+  width: 42px;
+  height: 42px;
+  top: 28px;
+  left: 7px;
+}
+
+.battle-stage.multiplayer .char-arm {
+  width: 10px;
+  height: 38px;
+  top: 28px;
+}
+
+.battle-stage.multiplayer .char-leg {
+  width: 12px;
+  height: 32px;
+  top: 70px;
+}
+
+.battle-stage.multiplayer .char-leg.left-leg { left: 12px; }
+.battle-stage.multiplayer .char-leg.right-leg { right: 12px; }
+
+/* Choice Bubble above Avatar's head */
+.choice-bubble {
+  position: absolute;
+  top: -85px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.6);
+  width: 56px;
+  height: 56px;
+  background-color: rgba(17, 24, 39, 0.9);
+  border: 3px solid var(--border-black);
+  box-shadow: inset -2px -2px 0px 0px rgba(0, 0, 0, 0.4);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.choice-bubble.active {
+  display: flex;
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+.choice-bubble .item-svg {
+  width: 75%;
+  height: 75%;
+}
+
+/* Name tag and health on pedestals */
+.pedestal-container .name-tag {
+  font-family: var(--font-pixel-sub);
+  font-size: 8px;
+  color: #ffffff;
+  text-shadow: 2px 2px 0px #000;
+  margin-top: 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pedestal-container .hearts-container {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+/* Player limit button states */
+.player-limit-btn.active {
+  background-color: var(--color-cyan) !important;
+  color: #1e1b4b !important;
+  border-color: var(--border-black) !important;
+  box-shadow: 
+    inset -2px -2px 0px 0px #0891b2,
+    inset 2px 2px 0px 0px #a5f3fc !important;
+}
+
+
 
 
 
