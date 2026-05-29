@@ -115,7 +115,9 @@ const gameState = {
   isHost: false,
   peerId: null,
   localChoice: null,
-  localRematchReady: false
+  localRematchReady: false,
+  rulesOpenedManually: false,
+  lastRulesState: ''
 };
 
 // 4. AUDIO SYNTH ENGINE (WEB AUDIO API)
@@ -371,6 +373,8 @@ const multiplayerPedestalsContainer = document.getElementById('multiplayer-pedes
 const playerLimitBtns = document.querySelectorAll('.player-limit-btn');
 const rulesBtn = document.getElementById('rules-btn');
 const rulesDropdown = document.getElementById('rules-dropdown');
+const rulesCloseBtn = document.getElementById('rules-close-btn');
+const rulesBtnText = document.getElementById('rules-btn-text');
 
 const skinCards = document.querySelectorAll('.skin-card');
 const modeEndless = document.getElementById('mode-endless');
@@ -2314,8 +2318,24 @@ if (rulesBtn && rulesDropdown) {
     e.stopPropagation();
     const isVisible = rulesDropdown.style.display === 'block';
     rulesDropdown.style.display = isVisible ? 'none' : 'block';
+    gameState.rulesOpenedManually = !isVisible;
+    
+    // Clear pulsing animation once manually clicked/opened
+    if (!isVisible) {
+      rulesBtn.classList.remove('rules-pulse-highlight');
+      rulesDropdown.classList.remove('rules-pulse-highlight');
+    }
     playClickSound();
   });
+
+  if (rulesCloseBtn) {
+    rulesCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      rulesDropdown.style.display = 'none';
+      gameState.rulesOpenedManually = false;
+      playClickSound();
+    });
+  }
 
   document.addEventListener('click', () => {
     rulesDropdown.style.display = 'none';
@@ -2326,9 +2346,14 @@ if (rulesBtn && rulesDropdown) {
   });
 }
 
+let autoCloseRulesTimeout = null;
+
 function updateRulesContent() {
   const rulesContent = document.getElementById('rules-content');
   if (!rulesContent) return;
+
+  let currentRulesLabel = '';
+  let activeRulesHtml = '';
 
   if (gameState.screen === 'battle' && gameState.mode === 'versus') {
     let aliveCount = 0;
@@ -2339,7 +2364,8 @@ function updateRulesContent() {
     }
 
     if (aliveCount === 4) {
-      rulesContent.innerHTML = `
+      currentRulesLabel = '4-PLAYER';
+      activeRulesHtml = `
         <span class="text-cyan" style="font-weight:bold;">[4-PLAYER MATCH]</span><br>
         • 4 players active.<br>
         • Choose Stone/Paper/Scissors.<br>
@@ -2348,7 +2374,8 @@ function updateRulesContent() {
         • Timeouts deal 1 HP loss.
       `;
     } else if (aliveCount === 3) {
-      rulesContent.innerHTML = `
+      currentRulesLabel = '3-PLAYER';
+      activeRulesHtml = `
         <span class="text-cyan" style="font-weight:bold;">[3-PLAYER MATCH]</span><br>
         • 3 players active (1 down!).<br>
         • Choose Stone/Paper/Scissors.<br>
@@ -2357,7 +2384,8 @@ function updateRulesContent() {
         • Timeouts deal 1 HP loss.
       `;
     } else if (aliveCount === 2) {
-      rulesContent.innerHTML = `
+      currentRulesLabel = '2-PLAYER';
+      activeRulesHtml = `
         <span class="text-cyan" style="font-weight:bold;">[2-PLAYER DUEL]</span><br>
         • 2 players active (2 down!).<br>
         • Classic 1v1 rules.<br>
@@ -2365,13 +2393,15 @@ function updateRulesContent() {
         • Timeouts deal 1 HP loss.
       `;
     } else {
-      rulesContent.innerHTML = `
+      currentRulesLabel = 'RESOLVED';
+      activeRulesHtml = `
         <span class="text-green" style="font-weight:bold;">[MATCH RESOLVED]</span><br>
         Match finished.
       `;
     }
   } else if (gameState.mode === 'match') {
-    rulesContent.innerHTML = `
+    currentRulesLabel = 'MATCH';
+    activeRulesHtml = `
       <span class="text-yellow" style="font-weight:bold;">[MATCH PLAY]</span><br>
       • Defeat the boss to win.<br>
       • Single boss fight per run.<br>
@@ -2379,7 +2409,8 @@ function updateRulesContent() {
       • Progresses to next stage.
     `;
   } else if (gameState.mode === 'endless') {
-    rulesContent.innerHTML = `
+    currentRulesLabel = 'ENDLESS';
+    activeRulesHtml = `
       <span class="text-green" style="font-weight:bold;">[ENDLESS SURVIVAL]</span><br>
       • Fight endless random bosses.<br>
       • Lose 3 hearts ➡️ Game Over.<br>
@@ -2387,8 +2418,65 @@ function updateRulesContent() {
       • Timer can be toggled off.
     `;
   } else {
-    rulesContent.innerHTML = `Select a game mode.`;
+    currentRulesLabel = 'NONE';
+    activeRulesHtml = `Select a game mode.`;
   }
+
+  // Update dropdown content
+  rulesContent.innerHTML = activeRulesHtml;
+
+  // Update dynamic button text (concise format next to the timer option)
+  if (rulesBtnText) {
+    let displayLabel = 'RULES';
+    if (currentRulesLabel === '4-PLAYER') displayLabel = 'RULES [4P]';
+    else if (currentRulesLabel === '3-PLAYER') displayLabel = 'RULES [3P]';
+    else if (currentRulesLabel === '2-PLAYER') displayLabel = 'RULES [DUEL]';
+    else if (currentRulesLabel === 'RESOLVED') displayLabel = 'RULES [DONE]';
+    else if (currentRulesLabel === 'ENDLESS') displayLabel = 'RULES [ENDLESS]';
+    else if (currentRulesLabel === 'MATCH') displayLabel = 'RULES [MATCH]';
+    
+    rulesBtnText.textContent = displayLabel;
+  }
+
+  // Trigger pulse highlight and auto-reveal only if rules actually changed
+  if (gameState.lastRulesState && gameState.lastRulesState !== currentRulesLabel) {
+    // Apply retro pulse animation to rules button and panel
+    if (rulesBtn) {
+      rulesBtn.classList.remove('rules-pulse-highlight');
+      void rulesBtn.offsetWidth; // Force reflow to restart animation
+      rulesBtn.classList.add('rules-pulse-highlight');
+    }
+    if (rulesDropdown) {
+      rulesDropdown.classList.remove('rules-pulse-highlight');
+      void rulesDropdown.offsetWidth; // Force reflow
+      rulesDropdown.classList.add('rules-pulse-highlight');
+      
+      // Auto-reveal rules dropdown in battle screen
+      if (gameState.screen === 'battle') {
+        rulesDropdown.style.display = 'block';
+      }
+    }
+
+    // Print notice in battle logs
+    let consoleMsg = `[SYSTEM]: Active rules shifted to ${currentRulesLabel} rules.`;
+    if (currentRulesLabel === '2-PLAYER') consoleMsg = `[SYSTEM]: Active rules shifted to 2-Player DUEL.`;
+    printLog(consoleMsg, 'text-yellow');
+
+    // Auto-close after 4 seconds (unless user opened manually)
+    if (autoCloseRulesTimeout) {
+      clearTimeout(autoCloseRulesTimeout);
+    }
+    autoCloseRulesTimeout = setTimeout(() => {
+      if (rulesDropdown && !gameState.rulesOpenedManually) {
+        rulesDropdown.style.display = 'none';
+      }
+      if (rulesBtn) rulesBtn.classList.remove('rules-pulse-highlight');
+      if (rulesDropdown) rulesDropdown.classList.remove('rules-pulse-highlight');
+    }, 4000);
+  }
+
+  // Track state
+  gameState.lastRulesState = currentRulesLabel;
 }
 
 // Initial update on load

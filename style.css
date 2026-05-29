@@ -1417,6 +1417,87 @@ body {
     inset 2px 2px 0px 0px #a5f3fc !important;
 }
 
+/* ==========================================================================
+   ACTIVE RULES BOX & HEADER STYLING
+   ========================================================================== */
+.rules-container {
+  position: relative;
+  display: inline-block;
+}
+
+.rules-dropdown-panel {
+  display: none;
+  position: absolute;
+  top: 36px;
+  right: 0;
+  width: 220px;
+  z-index: 100;
+  text-align: left;
+  padding: 12px;
+  font-family: var(--font-pixel-sub);
+  font-size: 9px;
+  line-height: 1.4;
+  color: #fff;
+  background: rgba(17, 24, 39, 0.96) !important;
+  border: 4px solid var(--border-black);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+  image-rendering: pixelated;
+}
+
+.rules-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.rules-close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.rules-close-btn:hover {
+  color: var(--color-red);
+}
+
+/* Glowing/pulsing highlight when rules update */
+.rules-pulse-highlight {
+  animation: pulseGoldBorder 1.2s ease-in-out 3;
+}
+
+@keyframes pulseGoldBorder {
+  0% {
+    border-color: var(--border-black);
+    box-shadow: 
+      inset -2px -2px 0px 0px #374151,
+      inset 2px 2px 0px 0px #6b7280,
+      0px 3px 0px 0px rgba(0,0,0,0.6);
+  }
+  50% {
+    border-color: var(--color-gold);
+    box-shadow: 
+      inset -2px -2px 0px 0px #eab308,
+      inset 2px 2px 0px 0px #fef08a,
+      0px 0px 15px rgba(250, 204, 21, 0.9);
+  }
+  100% {
+    border-color: var(--border-black);
+    box-shadow: 
+      inset -2px -2px 0px 0px #374151,
+      inset 2px 2px 0px 0px #6b7280,
+      0px 3px 0px 0px rgba(0,0,0,0.6);
+  }
+}
+
+
 
 
 
