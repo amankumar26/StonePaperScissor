@@ -1680,10 +1680,22 @@ function resolveVersusRound() {
   const uniqueWeapons = [...new Set(validWeapons)];
 
   let roundDraw = false;
+  const results = {};
 
-  if (uniqueWeapons.length === 3 || uniqueWeapons.length <= 1) {
+  if (uniqueWeapons.length <= 1) {
     roundDraw = true;
-  } else {
+    for (let pId in gameState.players) {
+      if (gameState.players[pId].isAlive) {
+        if (choices[pId] === 'timeout') {
+          results[pId] = 'timeout';
+        } else {
+          results[pId] = 'draw';
+        }
+      } else {
+        results[pId] = 'dead';
+      }
+    }
+  } else if (uniqueWeapons.length === 2) {
     const weaponA = uniqueWeapons[0];
     const weaponB = uniqueWeapons[1];
     let winningWeapon = '';
@@ -1706,30 +1718,84 @@ function resolveVersusRound() {
         hpChanges[pId] = -1;
       }
     });
-  }
 
-  const results = {};
-  for (let pId in gameState.players) {
-    if (gameState.players[pId].isAlive) {
-      if (choices[pId] === 'timeout') {
-        results[pId] = 'timeout';
-      } else if (roundDraw) {
-        results[pId] = 'draw';
-      } else {
-        const losingWeapon = uniqueWeapons.find(w => (
-          (w === 'stone' && uniqueWeapons.includes('paper')) ||
-          (w === 'paper' && uniqueWeapons.includes('scissors')) ||
-          (w === 'scissors' && uniqueWeapons.includes('stone'))
-        ));
-        const winningW = uniqueWeapons.find(w => w !== losingWeapon);
-        if (choices[pId] === winningW) {
+    for (let pId in gameState.players) {
+      if (gameState.players[pId].isAlive) {
+        if (choices[pId] === 'timeout') {
+          results[pId] = 'timeout';
+        } else if (choices[pId] === winningWeapon) {
           results[pId] = 'win';
         } else {
           results[pId] = 'lose';
         }
+      } else {
+        results[pId] = 'dead';
+      }
+    }
+  } else if (uniqueWeapons.length === 3) {
+    // Count choices for each weapon
+    const counts = { stone: 0, paper: 0, scissors: 0 };
+    validWeapons.forEach(w => {
+      counts[w] = (counts[w] || 0) + 1;
+    });
+
+    let maxCount = 0;
+    let majorityWeapon = null;
+    let isTie = false;
+
+    for (const w in counts) {
+      if (counts[w] > maxCount) {
+        maxCount = counts[w];
+        majorityWeapon = w;
+        isTie = false;
+      } else if (counts[w] === maxCount && maxCount > 0) {
+        isTie = true;
+      }
+    }
+
+    if (isTie) {
+      roundDraw = true;
+      for (let pId in gameState.players) {
+        if (gameState.players[pId].isAlive) {
+          if (choices[pId] === 'timeout') {
+            results[pId] = 'timeout';
+          } else {
+            results[pId] = 'draw';
+          }
+        } else {
+          results[pId] = 'dead';
+        }
       }
     } else {
-      results[pId] = 'dead';
+      // Majority wins! Determine what majority beats (losing weapon)
+      let losingWeapon = '';
+      if (majorityWeapon === 'stone') losingWeapon = 'scissors';
+      else if (majorityWeapon === 'paper') losingWeapon = 'stone';
+      else if (majorityWeapon === 'scissors') losingWeapon = 'paper';
+
+      const thirdWeapon = ['stone', 'paper', 'scissors'].find(w => w !== majorityWeapon && w !== losingWeapon);
+
+      validClashPlayers.forEach(pId => {
+        if (choices[pId] === losingWeapon) {
+          hpChanges[pId] = -1;
+        }
+      });
+
+      for (let pId in gameState.players) {
+        if (gameState.players[pId].isAlive) {
+          if (choices[pId] === 'timeout') {
+            results[pId] = 'timeout';
+          } else if (choices[pId] === majorityWeapon) {
+            results[pId] = 'win';
+          } else if (choices[pId] === losingWeapon) {
+            results[pId] = 'lose';
+          } else {
+            results[pId] = 'draw';
+          }
+        } else {
+          results[pId] = 'dead';
+        }
+      }
     }
   }
 
@@ -2369,7 +2435,8 @@ function updateRulesContent() {
         <span class="text-cyan" style="font-weight:bold;">[4-PLAYER MATCH]</span><br>
         • 4 players active.<br>
         • Choose Stone/Paper/Scissors.<br>
-        • If 3 weapons or all same ➡️ Draw.<br>
+        • If 3 weapons ➡️ Most-picked wins (Ties=Draw).<br>
+        • All same weapon ➡️ Draw.<br>
         • If 2 weapons ➡️ Winner hits losers.<br>
         • Timeouts deal 1 HP loss.
       `;
@@ -2379,7 +2446,8 @@ function updateRulesContent() {
         <span class="text-cyan" style="font-weight:bold;">[3-PLAYER MATCH]</span><br>
         • 3 players active (1 down!).<br>
         • Choose Stone/Paper/Scissors.<br>
-        • If 3 weapons or all same ➡️ Draw.<br>
+        • If 3 weapons ➡️ Most-picked wins (Ties=Draw).<br>
+        • All same weapon ➡️ Draw.<br>
         • If 2 weapons ➡️ Winner hits losers.<br>
         • Timeouts deal 1 HP loss.
       `;

@@ -26,9 +26,10 @@ An epic, retro 8-bit voxel combat arena built with HTML, Vanilla CSS, and JavaSc
 * **Simultaneous Moves**: Players choose their weapons in secret. The battle animation executes only after all active players lock in their moves.
 * **Simple Multiplayer Rules**:
   - Timeouts result in auto-damage (1 HP loss).
-  - If all 3 weapons are chosen (Stone, Paper, and Scissors) or if all players choose the same weapon, it is a **Draw** (no damage is dealt).
+  - If all 3 weapons are chosen (Stone, Paper, and Scissors): The most-picked weapon wins its clash (e.g., Stone beats Scissors, so Scissors players take damage, while Paper players are safe). If there is a tie for most-picked, or if all players choose the same weapon, it is a **Draw**.
   - If only 2 unique weapons are chosen (e.g. Stone vs Scissors), the winning weapon players deal 1 damage to the losing weapon players.
   - Battle is resolved dynamically with side-by-side player pedestals and floatable choice bubbles. The last player standing wins!
+
 
 ---
 
