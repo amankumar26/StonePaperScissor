@@ -1392,7 +1392,8 @@ function joinLobby(hostId) {
   try {
     if (!gameState.peer) {
       gameState.peer = new Peer(null, { debug: 1 });
-      gameState.peer.on('open', () => {
+      gameState.peer.on('open', (id) => {
+        gameState.peerId = id;
         connectToHost(hostId);
       });
       gameState.peer.on('error', (err) => {
@@ -2512,18 +2513,6 @@ document.getElementById('btn-copy-link').addEventListener('click', () => {
   });
 });
 
-// Auto-join if '?join=XXX' query param is present on load
-window.addEventListener('load', () => {
-  startNetworkHeartbeat();
-  const urlParams = new URLSearchParams(window.location.search);
-  const joinId = urlParams.get('join');
-  if (joinId) {
-    // Select versus mode automatically
-    selectVersusMode();
-    // Connect to peer ID
-    joinLobby(joinId);
-  }
-});
 
 /* ==========================================================================
    ROUND TIMER SYSTEM (3-SECOND COUNTDOWN)
@@ -2976,6 +2965,25 @@ function updateRulesContent() {
 
 // Initial update on load
 updateRulesContent();
+
+// Auto-join if '?join=XXX' query param is present on load (handles cached/fast loading states)
+function handleAutoJoin() {
+  startNetworkHeartbeat();
+  const urlParams = new URLSearchParams(window.location.search);
+  const joinId = urlParams.get('join');
+  if (joinId) {
+    // Select versus mode automatically
+    selectVersusMode();
+    // Connect to peer ID
+    joinLobby(joinId);
+  }
+}
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  handleAutoJoin();
+} else {
+  window.addEventListener('load', handleAutoJoin);
+}
 
 
 
