@@ -158,8 +158,4 @@ StonePaperScissor/
 - GitHub: [@amankumar26](https://github.com/amankumar26)
 - Live Game: [stonepaperscissor-xo5n.onrender.com](https://stonepaperscissor-xo5n.onrender.com)
 
----
 
-<div align="center">
-  Made with ❤️ and retro pixels · MIT License
-</div>

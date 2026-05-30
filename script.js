@@ -117,7 +117,9 @@ const gameState = {
   localChoice: null,
   localRematchReady: false,
   rulesOpenedManually: false,
-  lastRulesState: ''
+  lastRulesState: '',
+  versusGameType: 'normal', // normal, dare
+  currentDare: null
 };
 
 // 4. AUDIO SYNTH ENGINE (WEB AUDIO API)
@@ -604,6 +606,12 @@ function renderHearts(container, currentHP, maxHP) {
 function startGame() {
   restartBtn.removeAttribute('disabled');
   restartBtn.textContent = 'RESPAWN';
+
+  gameState.currentDare = null;
+  const dareSection = document.getElementById('gameover-dare-section');
+  if (dareSection) {
+    dareSection.style.display = 'none';
+  }
 
   // Restore static pedestals and visualizers for singleplayer modes
   playerFighter.style.display = 'flex';
@@ -1264,6 +1272,7 @@ function selectVersusMode() {
   }
   
   updateLobbyUI();
+  updateLobbyGameTypeUI();
 }
 
 function updateLobbyUI() {
@@ -1306,6 +1315,31 @@ function updateLobbyUI() {
     updateLobbyStatus('DISCONNECTED', 'red');
     playBtn.setAttribute('disabled', 'true');
     playBtn.textContent = 'CONNECT A FRIEND TO BATTLE';
+  }
+  updateLobbyGameTypeUI();
+}
+
+function updateLobbyGameTypeUI() {
+  const btnNormal = document.getElementById('btn-type-normal');
+  const btnDare = document.getElementById('btn-type-dare');
+  if (!btnNormal || !btnDare) return;
+
+  btnNormal.classList.remove('active');
+  btnDare.classList.remove('active');
+
+  if (gameState.versusGameType === 'dare') {
+    btnDare.classList.add('active');
+  } else {
+    btnNormal.classList.add('active');
+  }
+
+  const inLobby = gameState.peer && (gameState.peerId || gameState.conn);
+  if (inLobby && !gameState.isHost) {
+    btnNormal.setAttribute('disabled', 'true');
+    btnDare.setAttribute('disabled', 'true');
+  } else {
+    btnNormal.removeAttribute('disabled');
+    btnDare.removeAttribute('disabled');
   }
 }
 
@@ -1536,7 +1570,8 @@ function handlePeerMessage(data, conn) {
             playerIndex: reconnectIndex,
             maxPlayers: gameState.maxPlayers,
             players: gameState.players,
-            reconnect: true
+            reconnect: true,
+            versusGameType: gameState.versusGameType
           });
 
           // Broadcast player updates
@@ -1574,6 +1609,10 @@ function handlePeerMessage(data, conn) {
       gameState.playerIndex = data.playerIndex;
       gameState.maxPlayers = data.maxPlayers;
       gameState.players = data.players;
+      if (data.versusGameType) {
+        gameState.versusGameType = data.versusGameType;
+      }
+      updateLobbyGameTypeUI();
       
       sessionStorage.setItem('voxel_player_index', data.playerIndex);
       if (gameState.conn && gameState.conn.peer) {
@@ -1645,7 +1684,8 @@ function handlePeerMessage(data, conn) {
               type: 'init',
               playerIndex: newIndex,
               maxPlayers: gameState.maxPlayers,
-              players: gameState.players
+              players: gameState.players,
+              versusGameType: gameState.versusGameType
             });
 
             broadcast({
@@ -1673,7 +1713,28 @@ function handlePeerMessage(data, conn) {
 
     case 'start':
       gameState.players = data.players;
+      if (data.versusGameType) {
+        gameState.versusGameType = data.versusGameType;
+      }
       startVersusBattle();
+      break;
+
+    case 'game_type_update':
+      if (!gameState.isHost) {
+        gameState.versusGameType = data.gameType;
+        updateLobbyGameTypeUI();
+        printLog(`[MULTIPLAYER]: Host updated game type to ${data.gameType.toUpperCase()}`, 'text-yellow');
+      }
+      break;
+
+    case 'submit_dare':
+      gameState.currentDare = data.dareText;
+      const displayEl = document.getElementById('dare-text-display');
+      if (displayEl) {
+        displayEl.textContent = data.dareText;
+      }
+      playVictoryFanfare();
+      printLog(`[MULTIPLAYER]: Winner submitted dare: "${data.dareText}"`, 'text-red');
       break;
 
     case 'choice':
@@ -1960,6 +2021,12 @@ function startVersusBattle() {
   gameState.isLocked = false;
   gameState.localChoice = null;
   gameState.localRematchReady = false;
+  gameState.currentDare = null;
+
+  const dareSection = document.getElementById('gameover-dare-section');
+  if (dareSection) {
+    dareSection.style.display = 'none';
+  }
 
   for (let pId in gameState.players) {
     gameState.players[pId].hp = 3;
@@ -1973,7 +2040,7 @@ function startVersusBattle() {
   restartBtn.textContent = 'REMATCH';
 
   if (gameState.isHost && gameState.mode === 'versus') {
-    broadcast({ type: 'start', players: gameState.players });
+    broadcast({ type: 'start', players: gameState.players, versusGameType: gameState.versusGameType });
   }
 
   initMultiplayerPedestals();
@@ -2246,11 +2313,24 @@ function executeMulticlientDamageVisuals(choices, results, hpChanges, roundDraw)
       battleStatusMsg.textContent = 'YOU WIN ROUND!';
       clashText.textContent = 'HIT!';
       clashText.className = 'clash-effect text-green';
-    } else if (localResult === 'lose') {
+
+      // Update score and streak
+      gameState.score += 100 + (gameState.streak * 20);
+      gameState.streak++;
+      if (gameState.streak > gameState.maxStreak) {
+        gameState.maxStreak = gameState.streak;
+      }
+      hudScore.textContent = gameState.score;
+      hudStreak.textContent = gameState.streak;
+    } else if (localResult === 'lose' || localResult === 'timeout') {
       playLoseSound();
       battleStatusMsg.textContent = 'YOU TAKE DAMAGE!';
       clashText.textContent = 'OOF!';
       clashText.className = 'clash-effect text-red';
+
+      // Reset streak
+      gameState.streak = 0;
+      hudStreak.textContent = gameState.streak;
     } else {
       playDrawSound();
       battleStatusMsg.textContent = 'BATTLE RESOLVED!';
@@ -2375,6 +2455,13 @@ function endVersusGame(winnerIndex) {
   sessionStorage.removeItem('voxel_player_index');
   sessionStorage.removeItem('voxel_lobby_id');
   
+  // Save High Score
+  if (gameState.score > gameState.highScore) {
+    gameState.highScore = gameState.score;
+    localStorage.setItem('voxel_highscore', gameState.highScore);
+    printLog(`[NEW HIGH SCORE]: ${gameState.highScore} points!`, 'text-yellow');
+  }
+
   statFinalScore.textContent = gameState.score;
   statMaxStreak.textContent = gameState.maxStreak;
   statHighScore.textContent = gameState.highScore;
@@ -2462,7 +2549,56 @@ function endVersusGame(winnerIndex) {
     }
   }
 
+  // Handle Dare Mode logic
+  const dareSection = document.getElementById('gameover-dare-section');
+  const dareInputContainer = document.getElementById('dare-input-container');
+  const dareDisplayContainer = document.getElementById('dare-display-container');
+  const dareTextInput = document.getElementById('dare-text-input');
+  const dareTextDisplay = document.getElementById('dare-text-display');
+
+  if (dareSection) {
+    if (gameState.mode === 'versus' && gameState.versusGameType === 'dare' && winnerIndex !== null) {
+      dareSection.style.display = 'block';
+      if (dareTextInput) dareTextInput.value = '';
+      
+      if (winnerIndex == gameState.playerIndex) {
+        if (dareInputContainer) dareInputContainer.style.display = 'block';
+        if (dareDisplayContainer) dareDisplayContainer.style.display = 'none';
+      } else {
+        if (dareInputContainer) dareInputContainer.style.display = 'none';
+        if (dareDisplayContainer) {
+          dareDisplayContainer.style.display = 'block';
+          if (dareTextDisplay) {
+            dareTextDisplay.textContent = 'Waiting for the winner to write a dare...';
+          }
+        }
+      }
+    } else {
+      dareSection.style.display = 'none';
+    }
+  }
+
   switchScreen('gameover');
+}
+
+function submitWinnerDare() {
+  const input = document.getElementById('dare-text-input');
+  if (!input) return;
+  const dareText = input.value.trim();
+  if (!dareText) return;
+  
+  gameState.currentDare = dareText;
+  
+  const inputContainer = document.getElementById('dare-input-container');
+  const displayContainer = document.getElementById('dare-display-container');
+  const textDisplay = document.getElementById('dare-text-display');
+  
+  if (inputContainer) inputContainer.style.display = 'none';
+  if (displayContainer) displayContainer.style.display = 'block';
+  if (textDisplay) textDisplay.textContent = dareText;
+  
+  sendPeerMessage({ type: 'submit_dare', dareText: dareText });
+  printLog(`[MULTIPLAYER]: You submitted a dare: "${dareText}"`, 'text-green');
 }
 
 // Register Multiplayer DOM Action Handlers
@@ -2470,6 +2606,43 @@ document.getElementById('btn-create-lobby').addEventListener('click', () => {
   playClickSound();
   initPeer();
 });
+
+document.getElementById('btn-type-normal').addEventListener('click', () => {
+  if (gameState.peer && !gameState.isHost) return; // Client can't click
+  playClickSound();
+  gameState.versusGameType = 'normal';
+  updateLobbyGameTypeUI();
+  if (gameState.isHost) {
+    broadcast({ type: 'game_type_update', gameType: 'normal' });
+    printLog('[MULTIPLAYER]: Game type updated to NORMAL', 'text-yellow');
+  }
+});
+
+document.getElementById('btn-type-dare').addEventListener('click', () => {
+  if (gameState.peer && !gameState.isHost) return; // Client can't click
+  playClickSound();
+  gameState.versusGameType = 'dare';
+  updateLobbyGameTypeUI();
+  if (gameState.isHost) {
+    broadcast({ type: 'game_type_update', gameType: 'dare' });
+    printLog('[MULTIPLAYER]: Game type updated to WITH DARE', 'text-yellow');
+  }
+});
+
+const btnSubmitDare = document.getElementById('btn-submit-dare');
+const dareTextInputField = document.getElementById('dare-text-input');
+if (btnSubmitDare && dareTextInputField) {
+  btnSubmitDare.addEventListener('click', () => {
+    playClickSound();
+    submitWinnerDare();
+  });
+  dareTextInputField.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      playClickSound();
+      submitWinnerDare();
+    }
+  });
+}
 
 const btnReconnectLobby = document.getElementById('btn-reconnect-lobby');
 if (btnReconnectLobby) {

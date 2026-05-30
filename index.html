@@ -235,6 +235,15 @@
             <div id="multiplayer-panel" class="pixel-box-dark multiplayer-box" style="display: none; margin-top: 20px; padding: 16px; text-align: left;">
               <h3 class="section-title" style="margin-bottom: 12px; color: var(--color-cyan);">MULTIPLAYER LOBBY</h3>
               
+              <!-- Game Type Selection -->
+              <div id="lobby-game-type-container" style="margin-top: 12px; margin-bottom: 12px; padding: 8px; background: rgba(0,0,0,0.3); border: 2px solid var(--border-black); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <span class="pixel-subtitle" style="font-size: 9px; margin: 0; color: #fff;">GAME TYPE:</span>
+                <div style="display: flex; gap: 4px;">
+                  <button id="btn-type-normal" class="pixel-btn-small game-type-btn active" style="padding: 4px 8px; font-size: 9px;">NORMAL</button>
+                  <button id="btn-type-dare" class="pixel-btn-small game-type-btn" style="padding: 4px 8px; font-size: 9px;">WITH DARE</button>
+                </div>
+              </div>
+              
               <div class="lobby-status-container" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; background: rgba(0,0,0,0.3); padding: 8px 12px; border: 2px solid var(--border-black);">
                 <span class="status-dot red" id="lobby-status-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--color-red);"></span>
                 <span id="lobby-status-text" class="pixel-subtitle" style="font-size: 10px; letter-spacing: 1px; margin: 0; color: #fff;">STATUS: DISCONNECTED</span>
@@ -514,6 +523,23 @@
           <div class="gameover-actions">
             <button id="restart-btn" class="pixel-btn-large">RESPAWN</button>
             <button id="menu-btn" class="pixel-btn">MAIN MENU</button>
+          </div>
+
+          <!-- Dare Section -->
+          <div id="gameover-dare-section" class="pixel-box-dark" style="display: none; margin-top: 20px; padding: 16px; text-align: center; width: 100%;">
+            <div id="dare-input-container" style="display: none;">
+              <p class="pixel-subtitle" style="font-size: 10px; color: var(--color-cyan); margin-bottom: 8px;">WRITE A DARE FOR THE LOSERS!</p>
+              <div style="display: flex; gap: 8px; justify-content: center; align-items: center; width: 100%;">
+                <input type="text" id="dare-text-input" class="pixel-input" placeholder="Type dare (e.g. Sing a song!)..." style="flex-grow: 1; padding: 8px; font-size: 11px;">
+                <button id="btn-submit-dare" class="pixel-btn-small" style="padding: 8px 12px; font-size: 10px; height: 100%;">SUBMIT</button>
+              </div>
+            </div>
+            <div id="dare-display-container" style="display: none;">
+              <p class="pixel-subtitle" id="dare-display-title" style="font-size: 10px; color: var(--color-red); margin-bottom: 6px;">THE WINNER'S DARE:</p>
+              <div id="dare-text-display" class="pixel-text-gold" style="font-family: var(--font-pixel-sub); font-size: 11px; word-break: break-word; background: rgba(0,0,0,0.4); padding: 12px; border: 2px solid var(--border-black); line-height: 1.4;">
+                Waiting for the winner to write a dare...
+              </div>
+            </div>
           </div>
         </div>
       </section>
