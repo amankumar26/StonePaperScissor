@@ -160,6 +160,15 @@
             </div>
             <p id="mode-desc" class="mode-description">Fight infinitely to stack score and streaks. No HP cap.</p>
 
+            <div id="lobby-size-container" style="margin-top: 12px; margin-bottom: 12px; padding: 12px; background: rgba(0,0,0,0.3); border: 2px solid var(--border-black); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <span class="pixel-subtitle" style="font-size: 10px; margin: 0; color: #fff;">MAX PLAYERS:</span>
+              <div style="display: flex; gap: 4px;">
+                <button class="pixel-btn-small player-limit-btn active" data-limit="2" style="padding: 4px 8px; font-size: 9px;">2</button>
+                <button class="pixel-btn-small player-limit-btn" data-limit="3" style="padding: 4px 8px; font-size: 9px;">3</button>
+                <button class="pixel-btn-small player-limit-btn" data-limit="4" style="padding: 4px 8px; font-size: 9px;">4</button>
+              </div>
+            </div>
+
             <!-- Multiplayer Lobby Panel -->
             <div id="multiplayer-panel" class="pixel-box-dark multiplayer-box" style="display: none; margin-top: 20px; padding: 16px; text-align: left;">
               <h3 class="section-title" style="margin-bottom: 12px; color: var(--color-cyan);">MULTIPLAYER LOBBY</h3>
@@ -171,14 +180,6 @@
               
               <!-- Host lobby controls -->
               <div id="lobby-host-controls" class="lobby-section">
-                <div id="lobby-size-container" style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                  <span class="pixel-subtitle" style="font-size: 10px; margin: 0; color: #fff;">MAX PLAYERS:</span>
-                  <div style="display: flex; gap: 4px;">
-                    <button class="pixel-btn-small player-limit-btn active" data-limit="2" style="padding: 4px 8px; font-size: 9px;">2</button>
-                    <button class="pixel-btn-small player-limit-btn" data-limit="3" style="padding: 4px 8px; font-size: 9px;">3</button>
-                    <button class="pixel-btn-small player-limit-btn" data-limit="4" style="padding: 4px 8px; font-size: 9px;">4</button>
-                  </div>
-                </div>
                 <button id="btn-create-lobby" class="pixel-btn" style="width: 100%; margin-bottom: 8px;">CREATE LOBBY</button>
                 <div id="invite-link-container" style="display: none; margin-top: 8px;">
                   <p class="mode-description" style="margin-bottom: 6px;">Share this invite link with your friend:</p>

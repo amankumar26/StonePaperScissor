@@ -614,6 +614,25 @@ function startGame() {
     startVersusBattle();
     return;
   }
+  
+  if (gameState.maxPlayers > 2) {
+    gameState.isHost = true;
+    gameState.playerIndex = 1;
+    gameState.players = {};
+    gameState.players[1] = { hp: 3, isAlive: true, choice: null, skin: gameState.skin };
+    
+    for (let i = 2; i <= gameState.maxPlayers; i++) {
+      let botSkin = 'robot';
+      if (gameState.mode === 'match') {
+        botSkin = BOSSES[gameState.bossIndex].skinClass;
+      } else {
+        botSkin = BOSSES[Math.floor(Math.random() * BOSSES.length)].skinClass;
+      }
+      gameState.players[i] = { hp: 3, isAlive: true, choice: null, skin: botSkin };
+    }
+    startVersusBattle();
+    return;
+  }
 
   gameState.score = 0;
   gameState.streak = 0;
@@ -704,6 +723,21 @@ function executeRound(playerWeapon) {
     } else {
       startRoundTimer();
     }
+    return;
+  }
+  
+  if (gameState.maxPlayers > 2) {
+    gameState.isLocked = true;
+    gameState.localChoice = playerWeapon;
+    gameState.players[1].choice = playerWeapon;
+    
+    const weapons = ['stone', 'paper', 'scissors'];
+    for (let i = 2; i <= gameState.maxPlayers; i++) {
+      if (gameState.players[i].isAlive) {
+        gameState.players[i].choice = weapons[Math.floor(Math.random() * 3)];
+      }
+    }
+    resolveVersusRound();
     return;
   }
 
@@ -1581,7 +1615,7 @@ function startVersusBattle() {
   restartBtn.removeAttribute('disabled');
   restartBtn.textContent = 'REMATCH';
 
-  if (gameState.isHost) {
+  if (gameState.isHost && gameState.mode === 'versus') {
     broadcast({ type: 'start', players: gameState.players });
   }
 
@@ -1627,7 +1661,12 @@ function startVersusBattle() {
 
     multiplayerPedestalsContainer.appendChild(pedestalContainer);
 
-    const skinClass = SKINS[player.skin].skinClass;
+    let skinClass = 'skin-steve';
+    if (SKINS[player.skin]) {
+      skinClass = SKINS[player.skin].skinClass;
+    } else {
+      skinClass = player.skin; // Fallback to direct class string for bots
+    }
     renderFullBody(skinClass, avatarBlocky);
 
     renderHearts(heartsContainer, player.hp, 3);
@@ -1638,8 +1677,12 @@ function startVersusBattle() {
   clashText.textContent = 'VS';
   battleStatusMsg.textContent = 'CHOOSE WEAPON...';
 
+  let modeText = 'Online Versus match started!';
+  if (gameState.mode === 'endless') modeText = 'Endless Co-op Survival mode started!';
+  if (gameState.mode === 'match') modeText = 'Match Play Co-op mode started!';
+  
   consoleOutput.innerHTML = `
-    <div class="console-line text-yellow">[SYSTEM]: Online Versus match started! Max Players: ${gameState.maxPlayers}</div>
+    <div class="console-line text-yellow">[SYSTEM]: ${modeText} Max Players: ${gameState.maxPlayers}</div>
     <div class="console-line text-white">[SYSTEM]: Select your weapon. Protect your 3 hearts!</div>
   `;
   scrollConsole();
@@ -1810,13 +1853,15 @@ function resolveVersusRound() {
     gameState.players[pId].choice = null;
   }
 
-  broadcast({
-    type: 'resolve',
-    choices: choices,
-    results: results,
-    hpChanges: hpChanges,
-    roundDraw: roundDraw
-  });
+  if (gameState.mode === 'versus') {
+    broadcast({
+      type: 'resolve',
+      choices: choices,
+      results: results,
+      hpChanges: hpChanges,
+      roundDraw: roundDraw
+    });
+  }
 
   resolveVersusRoundFinal(choices, results, hpChanges, roundDraw);
 }
@@ -2017,9 +2062,6 @@ function endVersusGame(winnerIndex) {
     if (bubble) {
       bubble.classList.remove('active');
     }
-  }
-
-  for (let pId in gameState.players) {
     gameState.players[pId].rematchReady = false;
   }
   gameState.localRematchReady = false;
@@ -2027,25 +2069,74 @@ function endVersusGame(winnerIndex) {
   restartBtn.removeAttribute('disabled');
   restartBtn.textContent = 'REMATCH';
 
-  if (winnerIndex == gameState.playerIndex) {
-    gameoverTitle.textContent = "VICTORY!";
-    gameoverTitle.className = "pixel-title text-green";
-    gameoverSubtitle.textContent = "YOU SURVIVED AND WON";
-    gameoverSubtitle.className = "pixel-subtitle text-yellow";
-    playVictoryFanfare();
-  } else if (winnerIndex === null) {
-    gameoverTitle.textContent = "MUTUAL DRAW";
-    gameoverTitle.className = "pixel-title text-yellow";
-    gameoverSubtitle.textContent = "EVERYONE WAS ELIMINATED";
-    gameoverSubtitle.className = "pixel-subtitle text-white";
-    playLoseSound();
+  if (gameState.mode !== 'versus') {
+    if (winnerIndex == 1) { // Human won
+      if (gameState.mode === 'match') {
+        gameState.bossIndex++;
+        const clearedGauntlet = gameState.bossIndex >= BOSSES.length;
+        if (clearedGauntlet) {
+          gameoverTitle.textContent = "YOU BEAT THE GAME!";
+          gameoverTitle.className = "pixel-title text-gold";
+          gameoverSubtitle.textContent = "CONGRATULATIONS!";
+          gameoverSubtitle.className = "pixel-subtitle text-white";
+          playVictoryFanfare();
+        } else {
+          gameState.score += 500;
+          gameoverTitle.textContent = "BOSS DEFEATED!";
+          gameoverTitle.className = "pixel-title text-green";
+          gameoverSubtitle.textContent = "NEXT STAGE LOADING...";
+          playVictoryFanfare();
+          switchScreen('gameover');
+          setTimeout(() => {
+            // Restore player HP for next stage
+            gameState.playerHP = gameState.players[1].hp;
+            startGame();
+          }, 2500);
+          return;
+        }
+      } else { // Endless
+        gameState.score += 300;
+        gameoverTitle.textContent = "SURVIVED ROUND!";
+        gameoverTitle.className = "pixel-title text-green";
+        gameoverSubtitle.textContent = "NEXT ROUND LOADING...";
+        playVictoryFanfare();
+        switchScreen('gameover');
+        setTimeout(() => {
+          gameState.playerHP = gameState.players[1].hp;
+          startGame();
+        }, 2000);
+        return;
+      }
+    } else {
+      gameoverTitle.textContent = "GAME OVER";
+      gameoverTitle.className = "pixel-title text-red";
+      gameoverSubtitle.textContent = "YOU WERE ELIMINATED";
+      gameoverSubtitle.className = "pixel-subtitle text-white";
+      playLoseSound();
+      restartBtn.textContent = 'RESPAWN';
+    }
   } else {
-    gameoverTitle.textContent = "DEFEAT";
-    gameoverTitle.className = "pixel-title text-red";
-    const winnerSkinName = (gameState.players[winnerIndex].skin || '').toUpperCase();
-    gameoverSubtitle.textContent = `PLAYER ${winnerIndex} (${winnerSkinName}) WON THE MATCH`;
-    gameoverSubtitle.className = "pixel-subtitle text-white";
-    playLoseSound();
+    // Multiplayer Versus Mode Endings
+    if (winnerIndex == gameState.playerIndex) {
+      gameoverTitle.textContent = "VICTORY!";
+      gameoverTitle.className = "pixel-title text-green";
+      gameoverSubtitle.textContent = "YOU SURVIVED AND WON";
+      gameoverSubtitle.className = "pixel-subtitle text-yellow";
+      playVictoryFanfare();
+    } else if (winnerIndex === null) {
+      gameoverTitle.textContent = "MUTUAL DRAW";
+      gameoverTitle.className = "pixel-title text-yellow";
+      gameoverSubtitle.textContent = "EVERYONE WAS ELIMINATED";
+      gameoverSubtitle.className = "pixel-subtitle text-white";
+      playLoseSound();
+    } else {
+      gameoverTitle.textContent = "DEFEAT";
+      gameoverTitle.className = "pixel-title text-red";
+      const winnerSkinName = (gameState.players[winnerIndex].skin || '').toUpperCase();
+      gameoverSubtitle.textContent = `PLAYER ${winnerIndex} (${winnerSkinName}) WON THE MATCH`;
+      gameoverSubtitle.className = "pixel-subtitle text-white";
+      playLoseSound();
+    }
   }
 
   switchScreen('gameover');
@@ -2109,8 +2200,8 @@ function startRoundTimer() {
   
   if (gameState.screen !== 'battle') return;
 
-  // Skip timer if disabled for singleplayer modes
-  if (!gameState.timerEnabled && gameState.mode !== 'versus') {
+  // Skip timer if disabled
+  if (!gameState.timerEnabled) {
     const timerEl = document.getElementById('round-timer');
     if (timerEl) {
       timerEl.style.display = 'none';
@@ -2371,7 +2462,7 @@ if (timerToggleBtn) {
       timerToggleBtn.classList.remove('disabled');
       timerToggleBtn.title = 'Timer: ON';
       printLog('[SYSTEM]: Countdown timer enabled.', 'text-yellow');
-      if (gameState.screen === 'battle' && gameState.mode !== 'versus' && !gameState.isLocked) {
+      if (gameState.screen === 'battle' && !gameState.isLocked) {
         startRoundTimer();
       }
     }
