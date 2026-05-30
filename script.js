@@ -530,6 +530,8 @@ restartBtn.addEventListener('click', () => {
 menuBtn.addEventListener('click', () => {
   playClickSound();
   stopRoundTimer();
+  sessionStorage.removeItem('voxel_player_index');
+  sessionStorage.removeItem('voxel_lobby_id');
   switchScreen('splash');
 });
 
@@ -1265,6 +1267,22 @@ function updateLobbyUI() {
   const connectedCount = Object.keys(gameState.players).length;
   const isFull = connectedCount === gameState.maxPlayers;
 
+  const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
+  const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
+  const reconnectPanel = document.getElementById('lobby-reconnect-controls');
+  const btnReconnectLobby = document.getElementById('btn-reconnect-lobby');
+  if (reconnectPanel) {
+    if (savedLobbyId && savedPlayerIndex && (!gameState.peer || (!gameState.peerId && !gameState.conn))) {
+      reconnectPanel.style.display = 'block';
+      if (btnReconnectLobby) {
+        btnReconnectLobby.textContent = 'RECONNECT TO GAME';
+        btnReconnectLobby.removeAttribute('disabled');
+      }
+    } else {
+      reconnectPanel.style.display = 'none';
+    }
+  }
+
   if (gameState.peer && (gameState.peerId || gameState.conn)) {
     updateLobbyStatus(`CONNECTED! (${connectedCount}/${gameState.maxPlayers})`, 'green');
     if (gameState.isHost) {
@@ -1396,38 +1414,9 @@ function setupConnection(conn) {
   conn.lastActive = Date.now();
   gameState.hostLastActive = Date.now();
   if (gameState.isHost) {
-    gameState.connections.push(conn);
-    const clientIndex = gameState.connections.length + 1;
-    
-    gameState.players[clientIndex] = {
-      skin: 'steve',
-      choice: null,
-      hp: 3,
-      name: `PLAYER ${clientIndex}`,
-      isAlive: true,
-      rematchReady: false
-    };
-
     conn.on('open', () => {
-      console.log(`Connected client ${clientIndex} successfully!`);
+      console.log('Client connection opened, waiting for handshake...');
       playClickSound();
-      printLog(`[MULTIPLAYER]: Player ${clientIndex} joined!`, 'text-green');
-
-      // Initialize client state
-      conn.send({
-        type: 'init',
-        playerIndex: clientIndex,
-        maxPlayers: gameState.maxPlayers,
-        players: gameState.players
-      });
-
-      // Broadcast new player updates
-      broadcast({
-        type: 'players_update',
-        players: gameState.players
-      });
-      
-      updateLobbyUI();
     });
   } else {
     gameState.conn = conn;
@@ -1437,8 +1426,19 @@ function setupConnection(conn) {
       playClickSound();
       printLog('[MULTIPLAYER]: Connected to host lobby! Synchronizing...', 'text-green');
 
-      // Send local skin to host
-      conn.send({ type: 'skin', skin: gameState.skin });
+      const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
+      const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
+      
+      if (savedLobbyId === conn.peer && savedPlayerIndex) {
+        conn.send({
+          type: 'reconnect',
+          playerIndex: parseInt(savedPlayerIndex, 10),
+          skin: gameState.skin
+        });
+      } else {
+        // Send local skin to host
+        conn.send({ type: 'skin', skin: gameState.skin });
+      }
     });
   }
 
@@ -1457,12 +1457,8 @@ function setupConnection(conn) {
 }
 
 function getPlayerIndexByConn(conn) {
-  for (let i = 0; i < gameState.connections.length; i++) {
-    if (gameState.connections[i] === conn) {
-      return i + 2;
-    }
-  }
-  return null;
+  if (!conn) return null;
+  return conn.playerIndex || null;
 }
 
 function broadcast(msg) {
@@ -1485,6 +1481,15 @@ function sendPeerMessage(msg) {
   }
 }
 
+function getNextAvailablePlayerIndex() {
+  for (let i = 2; i <= gameState.maxPlayers; i++) {
+    if (!gameState.players[i]) {
+      return i;
+    }
+  }
+  return gameState.connections.length + 2;
+}
+
 function handlePeerMessage(data, conn) {
   const senderIndex = gameState.isHost ? getPlayerIndexByConn(conn) : 1;
 
@@ -1502,6 +1507,58 @@ function handlePeerMessage(data, conn) {
       }
       break;
 
+    case 'reconnect':
+      if (gameState.isHost) {
+        const reconnectIndex = data.playerIndex;
+        if (reconnectIndex && reconnectIndex > 1 && reconnectIndex <= gameState.maxPlayers && gameState.players[reconnectIndex]) {
+          conn.playerIndex = reconnectIndex;
+          
+          // Remove old connection if still in the array
+          gameState.connections = gameState.connections.filter(c => c.playerIndex !== reconnectIndex && c !== conn);
+          gameState.connections.push(conn);
+          
+          gameState.players[reconnectIndex].connected = true;
+          gameState.players[reconnectIndex].isAlive = (gameState.players[reconnectIndex].hp > 0);
+          gameState.players[reconnectIndex].skin = data.skin;
+          gameState.players[reconnectIndex].name = `PLAYER ${reconnectIndex} (${data.skin.toUpperCase()})`;
+
+          printLog(`[MULTIPLAYER]: Player ${reconnectIndex} has reconnected!`, 'text-green');
+
+          // Initialize client state
+          conn.send({
+            type: 'init',
+            playerIndex: reconnectIndex,
+            maxPlayers: gameState.maxPlayers,
+            players: gameState.players,
+            reconnect: true
+          });
+
+          // Broadcast player updates
+          broadcast({
+            type: 'players_update',
+            players: gameState.players
+          });
+
+          updateLobbyUI();
+
+          // If in battle screen, restore the reconnecting player's pedestal visual
+          if (gameState.screen === 'battle') {
+            // Check if they need to be resolved or if all choices are locked
+            let allChosen = true;
+            for (let pId in gameState.players) {
+              if (gameState.players[pId].isAlive && !gameState.players[pId].choice) {
+                allChosen = false;
+              }
+            }
+            if (allChosen) {
+              stopRoundTimer();
+              resolveVersusRound();
+            }
+          }
+        }
+      }
+      break;
+
     case 'rejected':
       printLog(`[MULTIPLAYER]: Rejected from lobby. Reason: ${data.reason}`, 'text-red');
       updateLobbyStatus('LOBBY FULL', 'red');
@@ -1511,10 +1568,39 @@ function handlePeerMessage(data, conn) {
       gameState.playerIndex = data.playerIndex;
       gameState.maxPlayers = data.maxPlayers;
       gameState.players = data.players;
-      printLog(`[MULTIPLAYER]: You entered the lobby as PLAYER ${data.playerIndex}`, 'text-yellow');
       
-      sendPeerMessage({ type: 'skin', skin: gameState.skin });
-      updateLobbyUI();
+      sessionStorage.setItem('voxel_player_index', data.playerIndex);
+      if (gameState.conn && gameState.conn.peer) {
+        sessionStorage.setItem('voxel_lobby_id', gameState.conn.peer);
+      }
+      
+      if (data.reconnect) {
+        printLog('[MULTIPLAYER]: Successfully reconnected to the active game!', 'text-green');
+        switchScreen('battle');
+        initMultiplayerPedestals();
+        document.querySelector('.battle-stage').classList.add('multiplayer');
+        
+        const reconnectPanel = document.getElementById('lobby-reconnect-controls');
+        if (reconnectPanel) reconnectPanel.style.display = 'none';
+        
+        gameState.isLocked = (gameState.players[gameState.playerIndex].choice !== null);
+        gameState.localChoice = gameState.players[gameState.playerIndex].choice;
+        
+        if (gameState.isLocked) {
+          battleStatusMsg.textContent = 'LOCKED! WAITING FOR FRIEND...';
+        } else {
+          battleStatusMsg.textContent = 'CHOOSE WEAPON...';
+        }
+        
+        stopRoundTimer();
+        if (gameState.timerEnabled && !gameState.isLocked) {
+          startRoundTimer();
+        }
+      } else {
+        printLog(`[MULTIPLAYER]: You entered the lobby as PLAYER ${data.playerIndex}`, 'text-yellow');
+        sendPeerMessage({ type: 'skin', skin: gameState.skin });
+        updateLobbyUI();
+      }
       break;
 
     case 'players_update':
@@ -1526,17 +1612,59 @@ function handlePeerMessage(data, conn) {
       break;
 
     case 'skin':
-      if (gameState.isHost && senderIndex) {
-        gameState.players[senderIndex].skin = data.skin;
-        gameState.players[senderIndex].name = `PLAYER ${senderIndex} (${data.skin.toUpperCase()})`;
-        printLog(`[MULTIPLAYER]: Player ${senderIndex} chose skin: ${data.skin.toUpperCase()}`, 'text-cyan');
-        
-        broadcast({
-          type: 'players_update',
-          players: gameState.players
-        });
-        
-        updateLobbyUI();
+      if (gameState.isHost) {
+        if (!senderIndex) {
+          // New connection joining the lobby
+          if (gameState.connections.length + 1 >= gameState.maxPlayers) {
+            conn.send({ type: 'rejected', reason: 'Lobby is full!' });
+            setTimeout(() => conn.close(), 500);
+          } else if (gameState.screen === 'battle') {
+            conn.send({ type: 'rejected', reason: 'Game is currently in progress!' });
+            setTimeout(() => conn.close(), 500);
+          } else {
+            const newIndex = getNextAvailablePlayerIndex();
+            conn.playerIndex = newIndex;
+            gameState.connections.push(conn);
+            
+            gameState.players[newIndex] = {
+              skin: data.skin,
+              choice: null,
+              hp: 3,
+              name: `PLAYER ${newIndex} (${data.skin.toUpperCase()})`,
+              isAlive: true,
+              rematchReady: false,
+              connected: true
+            };
+            
+            printLog(`[MULTIPLAYER]: Player ${newIndex} joined!`, 'text-green');
+
+            conn.send({
+              type: 'init',
+              playerIndex: newIndex,
+              maxPlayers: gameState.maxPlayers,
+              players: gameState.players
+            });
+
+            broadcast({
+              type: 'players_update',
+              players: gameState.players
+            });
+
+            updateLobbyUI();
+          }
+        } else {
+          // Existing player changing skin
+          gameState.players[senderIndex].skin = data.skin;
+          gameState.players[senderIndex].name = `PLAYER ${senderIndex} (${data.skin.toUpperCase()})`;
+          printLog(`[MULTIPLAYER]: Player ${senderIndex} chose skin: ${data.skin.toUpperCase()}`, 'text-cyan');
+          
+          broadcast({
+            type: 'players_update',
+            players: gameState.players
+          });
+          
+          updateLobbyUI();
+        }
       }
       break;
 
@@ -1631,14 +1759,16 @@ function handlePeerDisconnect(closedConn) {
     gameState.connections = gameState.connections.filter(c => c !== closedConn);
     
     if (senderIndex && gameState.players[senderIndex]) {
-      gameState.players[senderIndex].isAlive = false;
-      gameState.players[senderIndex].hp = 0;
+      gameState.players[senderIndex].connected = false;
+      gameState.players[senderIndex].choice = 'timeout';
     }
     
     let activeHumanCount = 1; // Host is always active
-    gameState.connections.forEach(c => {
-      if (c.open) activeHumanCount++;
-    });
+    for (let pId in gameState.players) {
+      if (pId > 1 && gameState.players[pId].connected && gameState.players[pId].isAlive) {
+        activeHumanCount++;
+      }
+    }
     
     if (gameState.screen === 'battle') {
       if (activeHumanCount < 2) {
@@ -1690,7 +1820,7 @@ function handlePeerDisconnect(closedConn) {
       }
     } else {
       const newPlayers = {
-        1: { skin: gameState.skin, choice: null, hp: 3, name: 'YOU (HOST)', isAlive: true, rematchReady: false }
+        1: { skin: gameState.skin, choice: null, hp: 3, name: 'YOU (HOST)', isAlive: true, rematchReady: false, connected: true }
       };
       
       gameState.connections.forEach((c, idx) => {
@@ -1701,8 +1831,10 @@ function handlePeerDisconnect(closedConn) {
           hp: 3,
           name: `PLAYER ${newIdx}`,
           isAlive: true,
-          rematchReady: false
+          rematchReady: false,
+          connected: true
         };
+        c.playerIndex = newIdx;
       });
       gameState.players = newPlayers;
       
@@ -1749,29 +1881,7 @@ function updateLobbyStatus(text, colorClass) {
   }
 }
 
-function startVersusBattle() {
-  gameState.score = 0;
-  gameState.streak = 0;
-  gameState.maxStreak = 0;
-  gameState.roundsPlayed = 0;
-  gameState.isLocked = false;
-  gameState.localChoice = null;
-  gameState.localRematchReady = false;
-
-  for (let pId in gameState.players) {
-    gameState.players[pId].hp = 3;
-    gameState.players[pId].isAlive = true;
-    gameState.players[pId].choice = null;
-    gameState.players[pId].rematchReady = false;
-  }
-
-  restartBtn.removeAttribute('disabled');
-  restartBtn.textContent = 'REMATCH';
-
-  if (gameState.isHost && gameState.mode === 'versus') {
-    broadcast({ type: 'start', players: gameState.players });
-  }
-
+function initMultiplayerPedestals() {
   playerFighter.style.display = 'none';
   enemyFighter.style.display = 'none';
   document.querySelector('.choice-visualizer').style.display = 'none';
@@ -1820,10 +1930,43 @@ function startVersusBattle() {
     } else {
       skinClass = player.skin; // Fallback to direct class string for bots
     }
-    renderFullBody(skinClass, avatarBlocky);
+    
+    if (player.connected === false || player.isAlive === false) {
+      avatarBlocky.className = 'avatar-blocky dead';
+      choiceBubble.style.display = 'none';
+    } else {
+      renderFullBody(skinClass, avatarBlocky);
+    }
 
     renderHearts(heartsContainer, player.hp, 3);
   }
+}
+
+function startVersusBattle() {
+  gameState.score = 0;
+  gameState.streak = 0;
+  gameState.maxStreak = 0;
+  gameState.roundsPlayed = 0;
+  gameState.isLocked = false;
+  gameState.localChoice = null;
+  gameState.localRematchReady = false;
+
+  for (let pId in gameState.players) {
+    gameState.players[pId].hp = 3;
+    gameState.players[pId].isAlive = true;
+    gameState.players[pId].choice = null;
+    gameState.players[pId].rematchReady = false;
+    gameState.players[pId].connected = true; // Initialize as connected
+  }
+
+  restartBtn.removeAttribute('disabled');
+  restartBtn.textContent = 'REMATCH';
+
+  if (gameState.isHost && gameState.mode === 'versus') {
+    broadcast({ type: 'start', players: gameState.players });
+  }
+
+  initMultiplayerPedestals();
 
   document.querySelector('.battle-stage').classList.add('multiplayer');
 
@@ -2153,7 +2296,7 @@ function resetVersusRoundState() {
   battleStatusMsg.textContent = 'CHOOSE WEAPON...';
 
   for (let pId in gameState.players) {
-    gameState.players[pId].choice = null;
+    gameState.players[pId].choice = (gameState.players[pId].connected === false) ? 'timeout' : null;
   }
 
   for (let pId in gameState.players) {
@@ -2204,6 +2347,9 @@ function checkVersusGameStatus() {
 
 function endVersusGame(winnerIndex) {
   stopRoundTimer();
+  
+  sessionStorage.removeItem('voxel_player_index');
+  sessionStorage.removeItem('voxel_lobby_id');
   
   statFinalScore.textContent = gameState.score;
   statMaxStreak.textContent = gameState.maxStreak;
@@ -2300,6 +2446,19 @@ document.getElementById('btn-create-lobby').addEventListener('click', () => {
   playClickSound();
   initPeer();
 });
+
+const btnReconnectLobby = document.getElementById('btn-reconnect-lobby');
+if (btnReconnectLobby) {
+  btnReconnectLobby.addEventListener('click', () => {
+    playClickSound();
+    const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
+    if (savedLobbyId) {
+      btnReconnectLobby.textContent = 'RECONNECTING...';
+      btnReconnectLobby.setAttribute('disabled', 'true');
+      joinLobby(savedLobbyId);
+    }
+  });
+}
 
 document.getElementById('btn-join-lobby').addEventListener('click', () => {
   playClickSound();
