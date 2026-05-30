@@ -712,16 +712,31 @@ function executeRound(playerWeapon) {
   if (gameState.mode === 'versus') {
     gameState.isLocked = true;
     gameState.localChoice = playerWeapon;
+    gameState.players[gameState.playerIndex].choice = playerWeapon;
     battleStatusMsg.textContent = 'LOCKED! WAITING FOR FRIEND...';
     printLog('[MULTIPLAYER]: Move locked. Waiting for opponent...', 'text-yellow');
     
     sendPeerMessage({ type: 'choice', choice: playerWeapon });
 
-    if (gameState.opponentChoice) {
-      stopRoundTimer();
-      resolveVersusRound();
+    if (gameState.isHost) {
+      let allChosen = true;
+      for (let pId in gameState.players) {
+        if (gameState.players[pId].isAlive && !gameState.players[pId].choice) {
+          allChosen = false;
+        }
+      }
+      if (allChosen) {
+        stopRoundTimer();
+        resolveVersusRound();
+      } else {
+        if (!timerInterval && gameState.timerEnabled) {
+          startRoundTimer();
+        }
+      }
     } else {
-      startRoundTimer();
+      if (!timerInterval && gameState.timerEnabled) {
+        startRoundTimer();
+      }
     }
     return;
   }
@@ -1081,6 +1096,87 @@ function endGame(isUltimateVictory) {
    P2P MULTIPLAYER / VERSUS MODE ENGINE (PEERJS)
    ========================================================================== */
 
+let networkHeartbeatInterval = null;
+
+function startNetworkHeartbeat() {
+  if (networkHeartbeatInterval) return;
+  
+  networkHeartbeatInterval = setInterval(() => {
+    if (gameState.mode !== 'versus') return;
+    
+    const now = Date.now();
+    
+    if (gameState.isHost) {
+      // 1. Send ping to all open client connections
+      gameState.connections.forEach(conn => {
+        if (conn.open) {
+          conn.send({ type: 'ping' });
+        }
+      });
+      
+      // 2. Check if any client is unresponsive
+      gameState.connections.forEach(conn => {
+        const pId = getPlayerIndexByConn(conn);
+        if (!pId) return;
+        
+        const player = gameState.players[pId];
+        if (!player || !player.isAlive) return;
+        
+        // Initialize lastActive if not present
+        if (!conn.lastActive) {
+          conn.lastActive = now;
+        }
+        
+        const elapsed = now - conn.lastActive;
+        
+        // If client hasn't ponged in > 9 seconds, treat them as lagging/timeout
+        if (elapsed > 9000) {
+          if (gameState.screen === 'battle' && !gameState.isLocked) {
+            // If we are in battle and waiting for their choice
+            if (!player.choice) {
+              player.choice = 'timeout';
+              printLog(`[MULTIPLAYER]: Player ${pId} (${player.skin.toUpperCase()}) is unresponsive. Auto-timing out.`, 'text-yellow');
+              
+              // Check if all players have chosen now
+              let allChosen = true;
+              for (let id in gameState.players) {
+                if (gameState.players[id].isAlive && !gameState.players[id].choice) {
+                  allChosen = false;
+                }
+              }
+              if (allChosen) {
+                stopRoundTimer();
+                resolveVersusRound();
+              }
+            }
+          }
+        }
+        
+        // If client hasn't ponged in > 20 seconds, assume disconnected
+        if (elapsed > 20000) {
+          printLog(`[MULTIPLAYER]: Player ${pId} connection timed out.`, 'text-red');
+          conn.close();
+          handlePeerDisconnect(conn);
+        }
+      });
+    } else {
+      // Client monitoring the host
+      if (gameState.conn && gameState.conn.open) {
+        if (!gameState.hostLastActive) {
+          gameState.hostLastActive = now;
+        }
+        
+        const elapsed = now - gameState.hostLastActive;
+        if (elapsed > 10000) {
+          printLog('[MULTIPLAYER]: Lost connection to host (timeout).', 'text-red');
+          gameState.conn.close();
+          handlePeerDisconnect(gameState.conn);
+        }
+      }
+    }
+  }, 3000);
+}
+
 const SKINS = {
   steve: {
     name: "STEVE",
@@ -1297,6 +1393,8 @@ function connectToHost(hostId) {
 }
 
 function setupConnection(conn) {
+  conn.lastActive = Date.now();
+  gameState.hostLastActive = Date.now();
   if (gameState.isHost) {
     gameState.connections.push(conn);
     const clientIndex = gameState.connections.length + 1;
@@ -1391,6 +1489,19 @@ function handlePeerMessage(data, conn) {
   const senderIndex = gameState.isHost ? getPlayerIndexByConn(conn) : 1;
 
   switch (data.type) {
+    case 'ping':
+      if (gameState.conn && gameState.conn.open) {
+        gameState.conn.send({ type: 'pong' });
+      }
+      gameState.hostLastActive = Date.now();
+      break;
+
+    case 'pong':
+      if (gameState.isHost) {
+        conn.lastActive = Date.now();
+      }
+      break;
+
     case 'rejected':
       printLog(`[MULTIPLAYER]: Rejected from lobby. Reason: ${data.reason}`, 'text-red');
       updateLobbyStatus('LOBBY FULL', 'red');
@@ -1519,22 +1630,64 @@ function handlePeerDisconnect(closedConn) {
     
     gameState.connections = gameState.connections.filter(c => c !== closedConn);
     
+    if (senderIndex && gameState.players[senderIndex]) {
+      gameState.players[senderIndex].isAlive = false;
+      gameState.players[senderIndex].hp = 0;
+    }
+    
+    let activeHumanCount = 1; // Host is always active
+    gameState.connections.forEach(c => {
+      if (c.open) activeHumanCount++;
+    });
+    
     if (gameState.screen === 'battle') {
-      battleStatusMsg.textContent = 'OPPONENT DISCONNECTED';
-      clashText.textContent = 'ABORT';
-      clashText.className = 'clash-effect text-red';
-      gameState.isLocked = true;
-      stopRoundTimer();
-      
-      gameState.connections.forEach(c => c.close());
-      gameState.connections = [];
-      gameState.players = {};
-      
-      setTimeout(() => {
-        switchScreen('splash');
-        updateLobbyStatus('DISCONNECTED', 'red');
-        selectVersusMode();
-      }, 2000);
+      if (activeHumanCount < 2) {
+        // Not enough players to continue, abort
+        battleStatusMsg.textContent = 'OPPONENT DISCONNECTED';
+        clashText.textContent = 'ABORT';
+        clashText.className = 'clash-effect text-red';
+        gameState.isLocked = true;
+        stopRoundTimer();
+        
+        gameState.connections.forEach(c => c.close());
+        gameState.connections = [];
+        gameState.players = {};
+        
+        setTimeout(() => {
+          switchScreen('splash');
+          updateLobbyStatus('DISCONNECTED', 'red');
+          selectVersusMode();
+        }, 2000);
+      } else {
+        // We have enough players to continue! Mark disconnected player as dead, broadcast, and check if all have chosen
+        printLog(`[MULTIPLAYER]: Continuing match with remaining players.`, 'text-yellow');
+        
+        broadcast({
+          type: 'players_update',
+          players: gameState.players
+        });
+        
+        const avatar = document.getElementById(`player-avatar-3d-${senderIndex}`);
+        if (avatar) {
+          avatar.className = 'avatar-blocky dead';
+        }
+        const bubble = document.getElementById(`choice-bubble-${senderIndex}`);
+        if (bubble) {
+          bubble.style.display = 'none';
+        }
+        
+        // Check if all remaining players have chosen
+        let allChosen = true;
+        for (let pId in gameState.players) {
+          if (gameState.players[pId].isAlive && !gameState.players[pId].choice) {
+            allChosen = false;
+          }
+        }
+        if (allChosen) {
+          stopRoundTimer();
+          resolveVersusRound();
+        }
+      }
     } else {
       const newPlayers = {
         1: { skin: gameState.skin, choice: null, hp: 3, name: 'YOU (HOST)', isAlive: true, rematchReady: false }
@@ -2179,6 +2332,7 @@ document.getElementById('btn-copy-link').addEventListener('click', () => {
 
 // Auto-join if '?join=XXX' query param is present on load
 window.addEventListener('load', () => {
+  startNetworkHeartbeat();
   const urlParams = new URLSearchParams(window.location.search);
   const joinId = urlParams.get('join');
   if (joinId) {
