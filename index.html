@@ -525,21 +525,52 @@
             <button id="menu-btn" class="pixel-btn">MAIN MENU</button>
           </div>
 
-          <!-- Dare Section -->
-          <div id="gameover-dare-section" class="pixel-box-dark" style="display: none; margin-top: 20px; padding: 16px; text-align: center; width: 100%;">
-            <div id="dare-input-container" style="display: none;">
-              <p class="pixel-subtitle" style="font-size: 10px; color: var(--color-cyan); margin-bottom: 8px;">WRITE A DARE FOR THE LOSERS!</p>
+          <!-- Truth or Dare Section -->
+          <div id="gameover-tod-section" class="pixel-box-dark" style="display: none; margin-top: 20px; padding: 16px; text-align: center; width: 100%;">
+            
+            <!-- Winner choosing mode: Truth vs Dare -->
+            <div id="tod-choice-container" style="display: none; margin-bottom: 12px;">
+              <p class="pixel-subtitle" style="font-size: 10px; color: var(--color-cyan); margin-bottom: 8px;">YOU WON! CHOOSE AN ACTION FOR THE LOSERS:</p>
+              <div style="display: flex; gap: 8px; justify-content: center;">
+                <button id="btn-choose-truth" class="pixel-btn-small active" style="padding: 6px 12px; font-size: 9px;">TRUTH</button>
+                <button id="btn-choose-dare" class="pixel-btn-small" style="padding: 6px 12px; font-size: 9px;">DARE</button>
+              </div>
+            </div>
+
+            <!-- Winner writing question/dare -->
+            <div id="tod-input-container" style="display: none;">
+              <p id="tod-input-label" class="pixel-subtitle" style="font-size: 10px; color: var(--color-cyan); margin-bottom: 8px;">WRITE A TRUTH QUESTION FOR THE LOSERS!</p>
               <div style="display: flex; gap: 8px; justify-content: center; align-items: center; width: 100%;">
-                <input type="text" id="dare-text-input" class="pixel-input" placeholder="Type dare (e.g. Sing a song!)..." style="flex-grow: 1; padding: 8px; font-size: 11px;">
-                <button id="btn-submit-dare" class="pixel-btn-small" style="padding: 8px 12px; font-size: 10px; height: 100%;">SUBMIT</button>
+                <input type="text" id="tod-text-input" class="pixel-input" placeholder="Type question (e.g. What is your biggest secret?)..." style="flex-grow: 1; padding: 8px; font-size: 11px;">
+                <button id="btn-submit-tod" class="pixel-btn-small" style="padding: 8px 12px; font-size: 10px; height: 100%;">SUBMIT</button>
               </div>
             </div>
-            <div id="dare-display-container" style="display: none;">
-              <p class="pixel-subtitle" id="dare-display-title" style="font-size: 10px; color: var(--color-red); margin-bottom: 6px;">THE WINNER'S DARE:</p>
-              <div id="dare-text-display" class="pixel-text-gold" style="font-family: var(--font-pixel-sub); font-size: 11px; word-break: break-word; background: rgba(0,0,0,0.4); padding: 12px; border: 2px solid var(--border-black); line-height: 1.4;">
-                Waiting for the winner to write a dare...
+
+            <!-- Displaying the Truth or Dare to everyone -->
+            <div id="tod-display-container" style="display: none;">
+              <p class="pixel-subtitle" id="tod-display-title" style="font-size: 10px; color: var(--color-red); margin-bottom: 6px;">THE WINNER'S TRUTH:</p>
+              <div id="tod-text-display" class="pixel-text-gold" style="font-family: var(--font-pixel-sub); font-size: 11px; word-break: break-word; background: rgba(0,0,0,0.4); padding: 12px; border: 2px solid var(--border-black); line-height: 1.4; margin-bottom: 12px;">
+                Waiting for the winner to choose...
+              </div>
+              
+              <!-- Loser answering Truth question -->
+              <div id="tod-answer-input-container" style="display: none; border-top: 2px dashed rgba(255,255,255,0.15); padding-top: 12px;">
+                <p class="pixel-subtitle" style="font-size: 9px; color: var(--color-cyan); margin-bottom: 8px;">YOUR ANSWER:</p>
+                <div style="display: flex; gap: 8px; justify-content: center; align-items: center; width: 100%;">
+                  <input type="text" id="tod-answer-input" class="pixel-input" placeholder="Type your answer here..." style="flex-grow: 1; padding: 8px; font-size: 11px;">
+                  <button id="btn-submit-tod-answer" class="pixel-btn-small" style="padding: 8px 12px; font-size: 10px; height: 100%;">SUBMIT</button>
+                </div>
+              </div>
+
+              <!-- Display of submitted answers -->
+              <div id="tod-answers-display-container" style="display: none; margin-top: 10px; text-align: left; background: rgba(0,0,0,0.3); border: 2px solid var(--border-black); padding: 8px;">
+                <p class="pixel-subtitle" style="font-size: 9px; color: var(--color-green); margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">ANSWERS:</p>
+                <div id="tod-answers-list" style="font-family: monospace; font-size: 10px; max-height: 100px; overflow-y: auto;">
+                  <!-- Answers populated via JS -->
+                </div>
               </div>
             </div>
+
           </div>
         </div>
       </section>

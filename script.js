@@ -118,8 +118,10 @@ const gameState = {
   localRematchReady: false,
   rulesOpenedManually: false,
   lastRulesState: '',
-  versusGameType: 'normal', // normal, dare
-  currentDare: null
+  versusGameType: 'normal', // normal, dare (lobby type)
+  todType: 'truth', // truth, dare (winner choice)
+  todQuestion: null,
+  todAnswers: []
 };
 
 // 4. AUDIO SYNTH ENGINE (WEB AUDIO API)
@@ -625,10 +627,11 @@ function startGame() {
   restartBtn.removeAttribute('disabled');
   restartBtn.textContent = 'RESPAWN';
 
-  gameState.currentDare = null;
-  const dareSection = document.getElementById('gameover-dare-section');
-  if (dareSection) {
-    dareSection.style.display = 'none';
+  gameState.todQuestion = null;
+  gameState.todAnswers = [];
+  const todSection = document.getElementById('gameover-tod-section');
+  if (todSection) {
+    todSection.style.display = 'none';
   }
 
   // Restore static pedestals and visualizers for singleplayer modes
@@ -1781,14 +1784,69 @@ function handlePeerMessage(data, conn) {
       }
       break;
 
-    case 'submit_dare':
-      gameState.currentDare = data.dareText;
-      const displayEl = document.getElementById('dare-text-display');
-      if (displayEl) {
-        displayEl.textContent = data.dareText;
+    case 'tod_question':
+      gameState.todType = data.qType;
+      gameState.todQuestion = data.text;
+      
+      const displayTitle = document.getElementById('tod-display-title');
+      const textDisplay = document.getElementById('tod-text-display');
+      
+      if (displayTitle) {
+        displayTitle.textContent = data.qType === 'truth' ? "THE WINNER'S TRUTH QUESTION:" : "THE WINNER'S DARE:";
       }
+      if (textDisplay) {
+        textDisplay.textContent = data.text;
+      }
+      
+      const ansInputContainer = document.getElementById('tod-answer-input-container');
+      const ansDisplayContainer = document.getElementById('tod-answers-display-container');
+      const ansList = document.getElementById('tod-answers-list');
+      
+      if (ansList) ansList.innerHTML = '';
+      if (ansDisplayContainer) ansDisplayContainer.style.display = data.qType === 'truth' ? 'block' : 'none';
+      
+      // If we are a loser (meaning not the winnerIndex), and it's truth, show answer input
+      if (data.qType === 'truth' && gameState.playerIndex != data.winnerIndex) {
+        if (ansInputContainer) ansInputContainer.style.display = 'block';
+        const ansInput = document.getElementById('tod-answer-input');
+        if (ansInput) ansInput.value = '';
+      } else {
+        if (ansInputContainer) ansInputContainer.style.display = 'none';
+      }
+      
       playVictoryFanfare();
-      printLog(`[MULTIPLAYER]: Winner submitted dare: "${data.dareText}"`, 'text-red');
+      printLog(`[MULTIPLAYER]: Winner chose ${data.qType.toUpperCase()}: "${data.text}"`, 'text-red');
+      break;
+
+    case 'tod_answer':
+      if (gameState.isHost && senderIndex) {
+        // Broadcast the answer to all clients
+        broadcast({
+          type: 'tod_answer',
+          senderIndex: senderIndex,
+          answerText: data.answerText
+        });
+      }
+      
+      const pIndex = data.senderIndex || senderIndex;
+      if (pIndex) {
+        const pSkin = (gameState.players[pIndex] && gameState.players[pIndex].skin) ? gameState.players[pIndex].skin.toUpperCase() : `P${pIndex}`;
+        const answersList = document.getElementById('tod-answers-list');
+        const answersDisplay = document.getElementById('tod-answers-display-container');
+        
+        if (answersList) {
+          const div = document.createElement('div');
+          div.style.marginBottom = '4px';
+          div.innerHTML = `<span class="text-cyan">${pSkin}:</span> <span class="text-white">${data.answerText}</span>`;
+          answersList.appendChild(div);
+          answersList.scrollTop = answersList.scrollHeight;
+        }
+        if (answersDisplay) {
+          answersDisplay.style.display = 'block';
+        }
+        printLog(`[MULTIPLAYER]: ${pSkin} answered: "${data.answerText}"`, 'text-green');
+        playClickSound();
+      }
       break;
 
     case 'choice':
@@ -2075,7 +2133,8 @@ function startVersusBattle() {
   gameState.isLocked = false;
   gameState.localChoice = null;
   gameState.localRematchReady = false;
-  gameState.currentDare = null;
+  gameState.todQuestion = null;
+  gameState.todAnswers = [];
 
   // Load mode-specific high score
   let scoreKey = 'voxel_highscore_endless';
@@ -2086,9 +2145,9 @@ function startVersusBattle() {
   }
   gameState.highScore = parseInt(localStorage.getItem(scoreKey) || localStorage.getItem('voxel_highscore') || '0', 10);
 
-  const dareSection = document.getElementById('gameover-dare-section');
-  if (dareSection) {
-    dareSection.style.display = 'none';
+  const todSection = document.getElementById('gameover-tod-section');
+  if (todSection) {
+    todSection.style.display = 'none';
   }
 
   for (let pId in gameState.players) {
@@ -2619,56 +2678,146 @@ function endVersusGame(winnerIndex) {
     }
   }
 
-  // Handle Dare Mode logic
-  const dareSection = document.getElementById('gameover-dare-section');
-  const dareInputContainer = document.getElementById('dare-input-container');
-  const dareDisplayContainer = document.getElementById('dare-display-container');
-  const dareTextInput = document.getElementById('dare-text-input');
-  const dareTextDisplay = document.getElementById('dare-text-display');
+  // Handle Truth or Dare logic
+  const todSection = document.getElementById('gameover-tod-section');
+  const todChoiceContainer = document.getElementById('tod-choice-container');
+  const todInputContainer = document.getElementById('tod-input-container');
+  const todDisplayContainer = document.getElementById('tod-display-container');
+  const todTextInput = document.getElementById('tod-text-input');
+  const todTextDisplay = document.getElementById('tod-text-display');
+  const todDisplayTitle = document.getElementById('tod-display-title');
+  const todAnsInputContainer = document.getElementById('tod-answer-input-container');
+  const todAnsDisplayContainer = document.getElementById('tod-answers-display-container');
+  const todAnsList = document.getElementById('tod-answers-list');
 
-  if (dareSection) {
+  if (todSection) {
     if (gameState.mode === 'versus' && gameState.versusGameType === 'dare' && winnerIndex !== null) {
-      dareSection.style.display = 'block';
-      if (dareTextInput) dareTextInput.value = '';
+      todSection.style.display = 'block';
+      if (todTextInput) todTextInput.value = '';
+      if (todAnsList) todAnsList.innerHTML = '';
+      if (todAnsDisplayContainer) todAnsDisplayContainer.style.display = 'none';
+      if (todAnsInputContainer) todAnsInputContainer.style.display = 'none';
       
       if (winnerIndex == gameState.playerIndex) {
-        if (dareInputContainer) dareInputContainer.style.display = 'block';
-        if (dareDisplayContainer) dareDisplayContainer.style.display = 'none';
+        gameState.todType = 'truth';
+        updateTodChoiceButtonsUI();
+        updateTodInputLabelUI();
+        if (todChoiceContainer) todChoiceContainer.style.display = 'block';
+        if (todInputContainer) todInputContainer.style.display = 'block';
+        if (todDisplayContainer) todDisplayContainer.style.display = 'none';
       } else {
-        if (dareInputContainer) dareInputContainer.style.display = 'none';
-        if (dareDisplayContainer) {
-          dareDisplayContainer.style.display = 'block';
-          if (dareTextDisplay) {
-            dareTextDisplay.textContent = 'Waiting for the winner to write a dare...';
-          }
+        if (todChoiceContainer) todChoiceContainer.style.display = 'none';
+        if (todInputContainer) todInputContainer.style.display = 'none';
+        if (todDisplayContainer) {
+          todDisplayContainer.style.display = 'block';
+          if (todDisplayTitle) todDisplayTitle.textContent = "STATUS:";
+          if (todTextDisplay) todTextDisplay.textContent = 'Waiting for the winner to choose Truth or Dare...';
         }
       }
     } else {
-      dareSection.style.display = 'none';
+      todSection.style.display = 'none';
     }
   }
 
   switchScreen('gameover');
 }
 
-function submitWinnerDare() {
-  const input = document.getElementById('dare-text-input');
+function updateTodChoiceButtonsUI() {
+  const btnTruth = document.getElementById('btn-choose-truth');
+  const btnDare = document.getElementById('btn-choose-dare');
+  if (!btnTruth || !btnDare) return;
+
+  btnTruth.classList.remove('active');
+  btnDare.classList.remove('active');
+
+  if (gameState.todType === 'truth') {
+    btnTruth.classList.add('active');
+  } else {
+    btnDare.classList.add('active');
+  }
+}
+
+function updateTodInputLabelUI() {
+  const label = document.getElementById('tod-input-label');
+  const input = document.getElementById('tod-text-input');
+  if (!label || !input) return;
+
+  if (gameState.todType === 'truth') {
+    label.textContent = "WRITE A TRUTH QUESTION FOR THE LOSERS!";
+    input.placeholder = "Type question (e.g. What is your biggest secret?)...";
+  } else {
+    label.textContent = "WRITE A DARE FOR THE LOSERS!";
+    input.placeholder = "Type dare (e.g. Sing a song!)...";
+  }
+}
+
+function submitWinnerTod() {
+  const input = document.getElementById('tod-text-input');
   if (!input) return;
-  const dareText = input.value.trim();
-  if (!dareText) return;
-  
-  gameState.currentDare = dareText;
-  
-  const inputContainer = document.getElementById('dare-input-container');
-  const displayContainer = document.getElementById('dare-display-container');
-  const textDisplay = document.getElementById('dare-text-display');
-  
+  const text = input.value.trim();
+  if (!text) return;
+
+  gameState.todQuestion = text;
+
+  const choiceContainer = document.getElementById('tod-choice-container');
+  const inputContainer = document.getElementById('tod-input-container');
+  const displayContainer = document.getElementById('tod-display-container');
+  const displayTitle = document.getElementById('tod-display-title');
+  const textDisplay = document.getElementById('tod-text-display');
+  const ansDisplayContainer = document.getElementById('tod-answers-display-container');
+
+  if (choiceContainer) choiceContainer.style.display = 'none';
   if (inputContainer) inputContainer.style.display = 'none';
   if (displayContainer) displayContainer.style.display = 'block';
-  if (textDisplay) textDisplay.textContent = dareText;
+
+  if (displayTitle) {
+    displayTitle.textContent = gameState.todType === 'truth' ? "THE WINNER'S TRUTH QUESTION:" : "THE WINNER'S DARE:";
+  }
+  if (textDisplay) textDisplay.textContent = text;
   
-  sendPeerMessage({ type: 'submit_dare', dareText: dareText });
-  printLog(`[MULTIPLAYER]: You submitted a dare: "${dareText}"`, 'text-green');
+  if (ansDisplayContainer) {
+    ansDisplayContainer.style.display = gameState.todType === 'truth' ? 'block' : 'none';
+  }
+
+  sendPeerMessage({
+    type: 'tod_question',
+    qType: gameState.todType,
+    text: text,
+    winnerIndex: gameState.playerIndex
+  });
+
+  printLog(`[MULTIPLAYER]: You submitted ${gameState.todType.toUpperCase()}: "${text}"`, 'text-green');
+}
+
+function submitLoserAnswer() {
+  const input = document.getElementById('tod-answer-input');
+  if (!input) return;
+  const answer = input.value.trim();
+  if (!answer) return;
+
+  const ansInputContainer = document.getElementById('tod-answer-input-container');
+  if (ansInputContainer) ansInputContainer.style.display = 'none';
+
+  const answersList = document.getElementById('tod-answers-list');
+  const answersDisplay = document.getElementById('tod-answers-display-container');
+  
+  if (answersList) {
+    const div = document.createElement('div');
+    div.style.marginBottom = '4px';
+    div.innerHTML = `<span class="text-cyan">YOU:</span> <span class="text-white">${answer}</span>`;
+    answersList.appendChild(div);
+    answersList.scrollTop = answersList.scrollHeight;
+  }
+  if (answersDisplay) {
+    answersDisplay.style.display = 'block';
+  }
+
+  sendPeerMessage({
+    type: 'tod_answer',
+    answerText: answer
+  });
+
+  printLog(`[MULTIPLAYER]: You answered: "${answer}"`, 'text-green');
 }
 
 // Register Multiplayer DOM Action Handlers
@@ -2699,17 +2848,50 @@ document.getElementById('btn-type-dare').addEventListener('click', () => {
   }
 });
 
-const btnSubmitDare = document.getElementById('btn-submit-dare');
-const dareTextInputField = document.getElementById('dare-text-input');
-if (btnSubmitDare && dareTextInputField) {
-  btnSubmitDare.addEventListener('click', () => {
+const btnChooseTruth = document.getElementById('btn-choose-truth');
+const btnChooseDare = document.getElementById('btn-choose-dare');
+const btnSubmitTod = document.getElementById('btn-submit-tod');
+const todTextInput = document.getElementById('tod-text-input');
+const btnSubmitTodAnswer = document.getElementById('btn-submit-tod-answer');
+const todAnswerInput = document.getElementById('tod-answer-input');
+
+if (btnChooseTruth) {
+  btnChooseTruth.addEventListener('click', () => {
     playClickSound();
-    submitWinnerDare();
+    gameState.todType = 'truth';
+    updateTodChoiceButtonsUI();
+    updateTodInputLabelUI();
   });
-  dareTextInputField.addEventListener('keypress', (e) => {
+}
+if (btnChooseDare) {
+  btnChooseDare.addEventListener('click', () => {
+    playClickSound();
+    gameState.todType = 'dare';
+    updateTodChoiceButtonsUI();
+    updateTodInputLabelUI();
+  });
+}
+if (btnSubmitTod && todTextInput) {
+  btnSubmitTod.addEventListener('click', () => {
+    playClickSound();
+    submitWinnerTod();
+  });
+  todTextInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       playClickSound();
-      submitWinnerDare();
+      submitWinnerTod();
+    }
+  });
+}
+if (btnSubmitTodAnswer && todAnswerInput) {
+  btnSubmitTodAnswer.addEventListener('click', () => {
+    playClickSound();
+    submitLoserAnswer();
+  });
+  todAnswerInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      playClickSound();
+      submitLoserAnswer();
     }
   });
 }
