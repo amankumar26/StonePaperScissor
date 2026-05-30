@@ -1,78 +1,165 @@
-# Voxel Showdown - Stone Paper Scissors
+<div align="center">
 
-👉 **Play Live Here:** [stonepaperscissor-xo5n.onrender.com](https://stonepaperscissor-xo5n.onrender.com)
+# ⚔️ Voxel Showdown
+### Stone • Paper • Scissors
 
-An epic, retro 8-bit voxel combat arena built with HTML, Vanilla CSS, and JavaScript. Battle the AI gauntlet, unlock skins, or invite a friend to clash in real-time Peer-to-Peer (P2P) multiplayer with a live battle console and interactive chat!
+**A retro pixel-art battle arena inspired by Minecraft & Roblox**
+
+[![Live Demo](https://img.shields.io/badge/🎮%20Play%20Live-Render-6366f1?style=for-the-badge)](https://stonepaperscissor-xo5n.onrender.com)
+[![HTML](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
+[![CSS](https://img.shields.io/badge/Vanilla%20CSS-264DE4?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
+[![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![WebRTC](https://img.shields.io/badge/WebRTC-333333?style=for-the-badge&logo=webrtc&logoColor=white)](https://webrtc.org/)
+
+</div>
+
+---
+
+## 🎯 About
+
+**Voxel Showdown** is a fully serverless, browser-based Stone Paper Scissors game dressed up as an epic 8-bit voxel battle arena. Choose your skin, pick your weapon, and fight through AI bosses — or go head-to-head with friends in real-time P2P multiplayer, all with zero backend required.
+
+> Built with **pure HTML, Vanilla CSS & JavaScript** — no frameworks, no servers, no databases.
 
 ---
 
 ## 🎮 Game Modes
 
-### 1. Endless Survival
-* Fight an infinite wave of random voxel enemies (Skeleton Archer, Zombie Knight, Spider Rider, and more).
-* Build high-score combos and win streaks.
-* 3 Hearts max — the run ends when you lose all hearts.
+### ♾️ Endless Survival
+- Fight an **infinite wave** of randomly chosen voxel enemies (Skeleton Archer, Zombie Knight, Spider Rider & more)
+- Build **high-score combos** and win streaks
+- You have **3 Hearts** — the run ends when you lose them all
 
-### 2. Match Play
-* A structured progressive gauntlet where you fight bosses in order (`HEROBRINE` ➡️ `ROBLOX KING` ➡️ `REDSTONE GOLEM` ➡️ `ENDER LORD` ➡️ `WITHER CHIEF`).
-* **Single Match Limitation**: Each match is exactly one boss fight. Win or lose, the match ends and returns you to the **Main Menu (Home Page)**.
-* **Progressive Tracking**: Winning a match advances your progress to the next boss. If you lose, you can retry the current boss from the splash screen.
-* Mode resets back to Boss 0 when explicitly re-selecting "Match Play" from the menu.
+### 🏆 Match Play
+- A **progressive boss gauntlet** — fight bosses in order:
+  `HEROBRINE` → `ROBLOX KING` → `REDSTONE GOLEM` → `ENDER LORD` → `WITHER CHIEF`
+- Each match is **exactly one boss fight** — win or lose, you return to the main menu
+- Winning **advances** your progress to the next boss; losing lets you retry the current one
+- Mode resets when you re-select "Match Play" from the menu
 
-### 3. Online Versus (P2P Multiplayer)
-* Battle 2, 3, or 4 players in real-time over the internet using WebRTC (powered by PeerJS).
-* **Lobby Configuration**: The host can configure the lobby size limit (2, 3, or 4 players). Clients join using the invite link.
-* **Mesh-Free Host Authority**: The host coordinates the lobby state, routes chat messages, and resolves rules, avoiding mesh network lag.
-* **Invite System**: Generate a lobby, copy a shareable invite link, and send it to your friends.
-* **Smart Parsing**: The join box automatically cleans and extracts the lobby code even if users copy-paste the entire URL.
-* **Simultaneous Moves**: Players choose their weapons in secret. The battle animation executes only after all active players lock in their moves.
-* **Simple Multiplayer Rules**:
-  - Timeouts result in auto-damage (1 HP loss).
-  - If all 3 weapons are chosen (Stone, Paper, and Scissors): The most-picked weapon wins its clash (e.g., Stone beats Scissors, so Scissors players take damage, while Paper players are safe). If there is a tie for most-picked, or if all players choose the same weapon, it is a **Draw**.
-  - If only 2 unique weapons are chosen (e.g. Stone vs Scissors), the winning weapon players deal 1 damage to the losing weapon players.
-  - Battle is resolved dynamically with side-by-side player pedestals and floatable choice bubbles. The last player standing wins!
+### 🌐 Online Versus (2–4 Players)
+- Real-time **P2P multiplayer** via WebRTC (powered by PeerJS) — no server needed
+- Host creates a lobby, shares an **invite link**, friends join instantly
+- Supports **2, 3, or 4 player** lobby sizes
+- **Simultaneous secret moves** — choices reveal only after all players lock in
+- Last player standing wins!
 
-
----
-
-## ⚡ Features & Audio System
-
-* **3-Second Countdown Timer**: A high-tension countdown with warning beeps that triggers auto-loss on timeout.
-  * In singleplayer, it can be toggled on/off in the header bar.
-  * In multiplayer, it is choice-activated (starts only after one player makes a choice to prevent stalling).
-* **Tabbed Battle Console**: 
-  * **LOG Tab**: Tracks system messages, choices, and round results.
-  * **CHAT Tab**: Interactive chatroom. Chats peer-to-peer (no databases, 100% ephemeral and serverless). Shows chosen skin names (e.g. `STEVE`, `ALEX`, `NOOB`, `CREEPER`) instead of generic user handles.
-* **Trash-Talking AI Bosses**: Sending a chat message in singleplayer triggers a custom, personality-tailored response from the voxel boss you are fighting!
-* **8-Bit Sound Engine**: Retro synth-beeps for clicks, draw, selection, hits, defeat, and victory.
-* **Header Controls**: Quick controls for muting audio and toggling the round timer (saves preference to `localStorage`).
+**Multiplayer Battle Rules:**
+| Scenario | Result |
+|---|---|
+| All 3 weapons chosen | Most-picked weapon wins its clash; tie = Draw |
+| 2 unique weapons chosen | Winning weapon players deal 1 damage to losers |
+| Player times out | Auto 1 HP loss |
+| All players same weapon | Draw |
 
 ---
 
-## 🚀 Setup & Local Running
+## ✨ Features
 
-Since the project uses purely static front-end assets, running it is simple:
-
-1. Clone this repository:
-   ```bash
-   git clone <your-repository-url>
-   ```
-2. Open `index.html` directly in your browser, or serve it using a lightweight local server (e.g., Live Server in VS Code, or Python):
-   ```bash
-   # Python 3
-   python -m http.server 8000
-   ```
-3. Open `http://localhost:8000` in your browser.
+| Feature | Details |
+|---|---|
+| 🎨 **4 Playable Skins** | Steve, Alex, Noob, Creeper — each with a unique pixel-art avatar |
+| ⏱️ **3-Second Countdown Timer** | High-tension timer with warning beeps; toggleable in singleplayer |
+| 🔊 **8-Bit Sound Engine** | Retro synth beeps for clicks, hits, draw, victory & defeat |
+| 💬 **Tabbed Battle Console** | **LOG** (round history) + **CHAT** (live P2P chat, ephemeral & serverless) |
+| 🤖 **AI Trash Talk** | Each boss responds to your chat messages with personality-tailored taunts |
+| 🔗 **Smart Invite Links** | Auto-extracts lobby code even if the full URL is pasted |
+| 🔁 **Reconnect System** | Rejoin a lobby mid-game after an accidental disconnect |
+| 📊 **Stats Tracking** | Final score, max streak, high score, and rounds played saved to `localStorage` |
+| 🔇 **Persistent Preferences** | Mute and timer settings saved across sessions via `localStorage` |
 
 ---
 
-## 🌐 Deployment (e.g., Render)
+## 🛠️ Tech Stack
 
-To deploy this project for free on **Render**:
+| Layer | Technology |
+|---|---|
+| Structure | HTML5 (Semantic) |
+| Styling | Vanilla CSS (custom pixel-art design system, CSS variables, animations) |
+| Logic | Vanilla JavaScript (ES6+, no frameworks) |
+| Multiplayer | [PeerJS](https://peerjs.com/) (WebRTC abstraction) |
+| Fonts | Google Fonts — Press Start 2P, Silkscreen, Inter |
+| Hosting | [Render](https://render.com/) (Static Site, auto-deploys on push) |
+| SEO | JSON-LD structured data (WebSite + SoftwareApplication schema), Open Graph, Twitter Cards, sitemap.xml |
 
-1. Log in to [Render](https://render.com/) and click **New > Static Site**.
-2. Connect your GitHub repository.
-3. Configure the settings:
-   * **Build Command**: (Leave empty)
-   * **Publish Directory**: `.` (or the folder containing `index.html`)
-4. Click **Create Static Site**. Render will automatically generate an `HTTPS` domain (required for WebRTC/PeerJS functionality) and redeploy on every new commit!
+---
+
+## 🚀 Run Locally
+
+Since the project is 100% static, no install step is needed.
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/amankumar26/StonePaperScissor.git
+cd StonePaperScissor
+
+# 2. Serve it (pick any method below)
+
+# Option A — Python
+python -m http.server 8000
+
+# Option B — Node.js (npx)
+npx serve .
+
+# Option C — VS Code Live Server extension
+# Right-click index.html → "Open with Live Server"
+```
+
+Then open **`http://localhost:8000`** in your browser.
+
+> ⚠️ **Multiplayer requires HTTPS.** For local P2P testing, use a tunneling tool like [ngrok](https://ngrok.com/) or deploy to Render.
+
+---
+
+## ☁️ Deploy on Render (Free)
+
+1. Log in to [render.com](https://render.com) → **New → Static Site**
+2. Connect your GitHub repository
+3. Configure:
+   | Setting | Value |
+   |---|---|
+   | Build Command | *(leave empty)* |
+   | Publish Directory | `.` |
+4. Click **Create Static Site**
+
+Render auto-generates an **HTTPS domain** (required for WebRTC) and **redeploys on every push** to `main`. ✅
+
+---
+
+## 📁 Project Structure
+
+```
+StonePaperScissor/
+├── index.html          # Main app — all screens (splash, battle, game over)
+├── style.css           # Full design system — pixel-art theme, animations, layout
+├── script.js           # All game logic — AI, P2P, sound engine, state machine
+├── favicon.svg         # Pixel-art isometric stone voxel cube icon (SVG)
+├── favicon.png         # PNG favicon fallback + Apple touch icon
+├── sitemap.xml         # SEO sitemap
+├── robots.txt          # Search engine crawler rules
+└── assets/             # Static assets (OG image, etc.)
+```
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Mobile touch gesture support for weapon selection
+- [ ] Global leaderboard (serverless via a KV store)
+- [ ] More skins (Enderman, Diamond Steve, Zombie)
+- [ ] Spectator mode for multiplayer lobbies
+- [ ] Tournament bracket mode (4-player elimination)
+
+---
+
+## 👤 Author
+
+**Aman Kumar**
+- GitHub: [@amankumar26](https://github.com/amankumar26)
+- Live Game: [stonepaperscissor-xo5n.onrender.com](https://stonepaperscissor-xo5n.onrender.com)
+
+---
+
+<div align="center">
+  Made with ❤️ and retro pixels · MIT License
+</div>
