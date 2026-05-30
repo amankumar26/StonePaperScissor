@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <!-- Dark background -->
+  <rect width="32" height="32" fill="#0f0f1a"/>
+
+  <!-- Isometric Voxel Cube: Stone texture -->
+  <!-- Top face (lightest) -->
+  <polygon points="16,4 28,10 16,16 4,10" fill="#b0b0b0"/>
+  <!-- Top face highlight patches -->
+  <polygon points="16,4 20,6 16,8 12,6" fill="#d0d0d0"/>
+  <polygon points="10,7 13,8.5 10,10 7,8.5" fill="#c0c0c0"/>
+  <polygon points="22,7 25,8.5 22,10 19,8.5" fill="#989898"/>
+
+  <!-- Left face (medium) -->
+  <polygon points="4,10 16,16 16,28 4,22" fill="#787878"/>
+  <!-- Left face shadow detail -->
+  <polygon points="5,12 9,14 9,17 5,15" fill="#606060"/>
+  <polygon points="10,15 13,16.5 13,20 10,18.5" fill="#888888"/>
+
+  <!-- Right face (darkest) -->
+  <polygon points="16,16 28,10 28,22 16,28" fill="#555555"/>
+  <!-- Right face crack detail -->
+  <polygon points="22,14 26,12 26,15 22,17" fill="#404040"/>
+  <polygon points="18,18 21,16 21,20 18,22" fill="#666666"/>
+
+  <!-- Gold outline edges -->
+  <polyline points="16,4 28,10 28,22 16,28 4,22 4,10 16,4" fill="none" stroke="#facc15" stroke-width="0.8"/>
+  <polyline points="16,4 16,16" fill="none" stroke="#facc15" stroke-width="0.8"/>
+  <polyline points="4,10 16,16 28,10" fill="none" stroke="#facc15" stroke-width="0.8"/>
+  <polyline points="16,16 16,28" fill="none" stroke="#facc15" stroke-width="0.8"/>
+
+  <!-- Subtle gold corner glow dots -->
+  <rect x="15" y="3" width="2" height="2" fill="#fef08a"/>
+  <rect x="27" y="9" width="2" height="2" fill="#facc15"/>
+  <rect x="3" y="9" width="2" height="2" fill="#facc15"/>
+</svg>
