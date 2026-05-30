@@ -498,6 +498,24 @@ updateMuteIcon();
 // Start button trigger
 playBtn.addEventListener('click', () => {
   playClickSound();
+
+  if (gameState.mode === 'versus') {
+    const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
+    const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
+    
+    // If we have a saved lobby and we are currently disconnected
+    if (savedLobbyId && (!gameState.peer || (!gameState.peerId && !gameState.conn))) {
+      if (savedPlayerIndex === '1') {
+        printLog('[MULTIPLAYER]: Rejoining lobby as Host...', 'text-yellow');
+        initPeer(savedLobbyId);
+      } else {
+        printLog('[MULTIPLAYER]: Rejoining lobby as Client...', 'text-green');
+        joinLobby(savedLobbyId);
+      }
+      return;
+    }
+  }
+
   startGame();
 });
 
@@ -1330,8 +1348,14 @@ function updateLobbyUI() {
     }
   } else {
     updateLobbyStatus('DISCONNECTED', 'red');
-    playBtn.setAttribute('disabled', 'true');
-    playBtn.textContent = 'CONNECT A FRIEND TO BATTLE';
+    const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
+    if (savedLobbyId) {
+      playBtn.removeAttribute('disabled');
+      playBtn.textContent = 'CONNECT A FRIEND TO BATTLE';
+    } else {
+      playBtn.setAttribute('disabled', 'true');
+      playBtn.textContent = 'CONNECT A FRIEND TO BATTLE';
+    }
   }
   updateLobbyGameTypeUI();
 }
@@ -1360,13 +1384,13 @@ function updateLobbyGameTypeUI() {
   }
 }
 
-function initPeer() {
+function initPeer(customId = null) {
   if (gameState.peer) return;
 
   updateLobbyStatus('CONNECTING...', 'yellow');
 
   try {
-    gameState.peer = new Peer(null, {
+    gameState.peer = new Peer(customId, {
       debug: 1
     });
 
@@ -1377,6 +1401,9 @@ function initPeer() {
       gameState.players = {
         1: { skin: gameState.skin, choice: null, hp: 3, name: 'YOU (HOST)', isAlive: true, rematchReady: false }
       };
+      
+      sessionStorage.setItem('voxel_lobby_id', id);
+      sessionStorage.setItem('voxel_player_index', '1');
       
       console.log('PeerJS initialized with ID:', id);
       
@@ -1437,6 +1464,16 @@ function extractPeerId(inputString) {
 function joinLobby(hostId) {
   hostId = extractPeerId(hostId);
   if (!hostId) return;
+  
+  const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
+  const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
+  
+  // If we are host and entered our own lobby ID/link, re-host it
+  if (savedLobbyId === hostId && savedPlayerIndex === '1') {
+    printLog('[MULTIPLAYER]: Re-creating lobby as Host...', 'text-yellow');
+    initPeer(hostId);
+    return;
+  }
   
   updateLobbyStatus('CONNECTING TO SIGNALING...', 'yellow');
   
@@ -2682,10 +2719,15 @@ if (btnReconnectLobby) {
   btnReconnectLobby.addEventListener('click', () => {
     playClickSound();
     const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
+    const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
     if (savedLobbyId) {
       btnReconnectLobby.textContent = 'RECONNECTING...';
       btnReconnectLobby.setAttribute('disabled', 'true');
-      joinLobby(savedLobbyId);
+      if (savedPlayerIndex === '1') {
+        initPeer(savedLobbyId);
+      } else {
+        joinLobby(savedLobbyId);
+      }
     }
   });
 }
