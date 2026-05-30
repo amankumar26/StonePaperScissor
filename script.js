@@ -93,7 +93,7 @@ const gameState = {
   skin: 'steve',
   mode: 'endless', // endless, match
   score: 0,
-  highScore: parseInt(localStorage.getItem('voxel_highscore') || '0', 10),
+  highScore: parseInt(localStorage.getItem('voxel_highscore_endless') || localStorage.getItem('voxel_highscore') || '0', 10),
   streak: 0,
   maxStreak: 0,
   playerHP: 3,
@@ -655,6 +655,15 @@ function startGame() {
   }
   gameState.isLocked = false;
 
+  // Load mode-specific high score
+  let scoreKey = 'voxel_highscore_endless';
+  if (gameState.mode === 'match') {
+    scoreKey = 'voxel_highscore_match';
+  } else if (gameState.mode === 'versus') {
+    scoreKey = 'voxel_highscore_versus';
+  }
+  gameState.highScore = parseInt(localStorage.getItem(scoreKey) || localStorage.getItem('voxel_highscore') || '0', 10);
+
   // Set up player skin SVG in HUD
   const activeSkinCard = document.querySelector('.skin-card.active');
   hudPlayerAvatar.innerHTML = activeSkinCard.querySelector('.skin-avatar').innerHTML;
@@ -772,7 +781,6 @@ function executeRound(playerWeapon) {
   }
 
   gameState.isLocked = true;
-  gameState.roundsPlayed++;
 
   // Clear displays
   playerChoiceDisplay.classList.remove('active');
@@ -1058,14 +1066,23 @@ function advanceStage() {
 // 13. GAME END HANDLER
 function endGame(isUltimateVictory) {
   stopRoundTimer();
-  // Save High Score
+  
+  // Save High Score for current mode
+  let scoreKey = 'voxel_highscore_endless';
+  if (gameState.mode === 'match') {
+    scoreKey = 'voxel_highscore_match';
+  } else if (gameState.mode === 'versus') {
+    scoreKey = 'voxel_highscore_versus';
+  }
+
   if (gameState.score > gameState.highScore) {
     gameState.highScore = gameState.score;
-    localStorage.setItem('voxel_highscore', gameState.highScore);
+    localStorage.setItem(scoreKey, gameState.highScore);
     printLog(`[NEW HIGH SCORE]: ${gameState.highScore} points!`, 'text-yellow');
   }
 
   // Setup Game Over screen stats
+  gameState.roundsPlayed = 1; // 1 match completed
   statFinalScore.textContent = gameState.score;
   statMaxStreak.textContent = gameState.maxStreak;
   statHighScore.textContent = gameState.highScore;
@@ -2023,6 +2040,15 @@ function startVersusBattle() {
   gameState.localRematchReady = false;
   gameState.currentDare = null;
 
+  // Load mode-specific high score
+  let scoreKey = 'voxel_highscore_endless';
+  if (gameState.mode === 'match') {
+    scoreKey = 'voxel_highscore_match';
+  } else if (gameState.mode === 'versus') {
+    scoreKey = 'voxel_highscore_versus';
+  }
+  gameState.highScore = parseInt(localStorage.getItem(scoreKey) || localStorage.getItem('voxel_highscore') || '0', 10);
+
   const dareSection = document.getElementById('gameover-dare-section');
   if (dareSection) {
     dareSection.style.display = 'none';
@@ -2071,7 +2097,6 @@ function startVersusBattle() {
 }
 
 function resolveVersusRound() {
-  gameState.roundsPlayed++;
   
   const choices = {};
   const activePlayers = [];
@@ -2455,13 +2480,21 @@ function endVersusGame(winnerIndex) {
   sessionStorage.removeItem('voxel_player_index');
   sessionStorage.removeItem('voxel_lobby_id');
   
-  // Save High Score
+  // Save High Score for current mode
+  let scoreKey = 'voxel_highscore_endless';
+  if (gameState.mode === 'match') {
+    scoreKey = 'voxel_highscore_match';
+  } else if (gameState.mode === 'versus') {
+    scoreKey = 'voxel_highscore_versus';
+  }
+
   if (gameState.score > gameState.highScore) {
     gameState.highScore = gameState.score;
-    localStorage.setItem('voxel_highscore', gameState.highScore);
+    localStorage.setItem(scoreKey, gameState.highScore);
     printLog(`[NEW HIGH SCORE]: ${gameState.highScore} points!`, 'text-yellow');
   }
 
+  gameState.roundsPlayed = 1; // 1 match completed
   statFinalScore.textContent = gameState.score;
   statMaxStreak.textContent = gameState.maxStreak;
   statHighScore.textContent = gameState.highScore;
