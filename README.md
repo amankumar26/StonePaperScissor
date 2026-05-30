@@ -1,5 +1,7 @@
 # Voxel Showdown - Stone Paper Scissors
 
+👉 **Play Live Here:** [stonepaperscissor-xo5n.onrender.com](https://stonepaperscissor-xo5n.onrender.com)
+
 An epic, retro 8-bit voxel combat arena built with HTML, Vanilla CSS, and JavaScript. Battle the AI gauntlet, unlock skins, or invite a friend to clash in real-time Peer-to-Peer (P2P) multiplayer with a live battle console and interactive chat!
 
 ---
