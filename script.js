@@ -2136,13 +2136,6 @@ function resolveVersusRound() {
   }
 
   for (let pId in gameState.players) {
-    if (gameState.players[pId].isAlive) {
-      gameState.players[pId].hp += hpChanges[pId];
-      if (gameState.players[pId].hp <= 0) {
-        gameState.players[pId].hp = 0;
-        gameState.players[pId].isAlive = false;
-      }
-    }
     gameState.players[pId].choice = null;
   }
 
