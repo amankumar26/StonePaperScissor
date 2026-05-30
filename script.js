@@ -1733,6 +1733,9 @@ function handlePeerMessage(data, conn) {
         playClickSound();
         triggerChatTabNotification();
       } else if (!gameState.isHost) {
+        if (data.senderIndex === gameState.playerIndex) {
+          break;
+        }
         const sender = gameState.players[data.senderIndex];
         if (sender) {
           const skinName = (sender.skin || 'steve').toUpperCase();
@@ -2665,7 +2668,7 @@ function sendChatMessage() {
   // Send to peer if online versus mode
   if (gameState.mode === 'versus') {
     if (gameState.isHost || (gameState.conn && gameState.conn.open)) {
-      sendPeerMessage({ type: 'chat', message: msg });
+      sendPeerMessage({ type: 'chat', message: msg, senderIndex: gameState.playerIndex });
     }
   } else {
     // Singleplayer mode: trigger funny AI chatbot reply!
