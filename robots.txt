@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://stonepaperscissor-xo5n.onrender.com/sitemap.xml
