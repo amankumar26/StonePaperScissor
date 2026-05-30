@@ -711,6 +711,11 @@ function scrollConsole() {
 function executeRound(playerWeapon) {
   stopRoundTimer();
 
+  // Block choices if the local player is dead
+  if (gameState.mode === 'versus' && gameState.players[gameState.playerIndex] && gameState.players[gameState.playerIndex].isAlive === false) {
+    return;
+  }
+
   if (gameState.mode === 'versus') {
     gameState.isLocked = true;
     gameState.localChoice = playerWeapon;
@@ -1888,6 +1893,10 @@ function initMultiplayerPedestals() {
 
   for (let pId in gameState.players) {
     const player = gameState.players[pId];
+    if (player.isAlive === false) {
+      continue;
+    }
+    
     const isSelf = pId == gameState.playerIndex;
     const nameLabel = isSelf ? `YOU (P${pId})` : `PLAYER ${pId}`;
 
@@ -1928,7 +1937,7 @@ function initMultiplayerPedestals() {
       skinClass = player.skin; // Fallback to direct class string for bots
     }
     
-    if (player.connected === false || player.isAlive === false) {
+    if (player.connected === false) {
       avatarBlocky.className = 'avatar-blocky dead';
       choiceBubble.style.display = 'none';
     } else {
@@ -1964,6 +1973,11 @@ function startVersusBattle() {
   }
 
   initMultiplayerPedestals();
+
+  const choicesContainer = document.querySelector('.choices-container');
+  if (choicesContainer) {
+    choicesContainer.style.display = '';
+  }
 
   document.querySelector('.battle-stage').classList.add('multiplayer');
 
@@ -2283,7 +2297,23 @@ function resetVersusRoundState() {
   gameState.isLocked = false;
   clashText.textContent = 'VS';
   clashText.className = 'clash-effect';
-  battleStatusMsg.textContent = 'CHOOSE WEAPON...';
+
+  // Redraw pedestals so dead players disappear and alive ones re-center
+  initMultiplayerPedestals();
+
+  const localPlayer = gameState.players[gameState.playerIndex];
+  const choicesContainer = document.querySelector('.choices-container');
+  if (choicesContainer) {
+    if (localPlayer && localPlayer.isAlive === false) {
+      choicesContainer.style.display = 'none';
+      battleStatusMsg.textContent = 'SPECTATING BATTLE...';
+    } else {
+      choicesContainer.style.display = '';
+      battleStatusMsg.textContent = 'CHOOSE WEAPON...';
+    }
+  } else {
+    battleStatusMsg.textContent = 'CHOOSE WEAPON...';
+  }
 
   for (let pId in gameState.players) {
     gameState.players[pId].choice = (gameState.players[pId].connected === false) ? 'timeout' : null;
