@@ -1605,9 +1605,6 @@ function handlePeerMessage(data, conn) {
 
     case 'players_update':
       gameState.players = data.players;
-      if (!gameState.isHost) {
-        sendPeerMessage({ type: 'skin', skin: gameState.skin });
-      }
       updateLobbyUI();
       break;
 
