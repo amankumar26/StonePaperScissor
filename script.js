@@ -1450,6 +1450,33 @@ function updateLobbyGameTypeUI() {
   }
 }
 
+function handlePeerError(err) {
+  console.error('PeerJS client error:', err);
+  
+  let friendlyMsg = '[ERROR]: ' + err.message;
+  if (err.type === 'peer-unavailable') {
+    friendlyMsg = '[ERROR]: The lobby code is invalid, or the host is offline.';
+  } else if (err.type === 'network' || err.type === 'disconnected') {
+    friendlyMsg = '[ERROR]: Signaling connection lost. Please try reconnecting.';
+  }
+  
+  printLog(friendlyMsg, 'text-red');
+  updateLobbyStatus('ERROR / OFFLINE', 'red');
+
+  // Clean up PeerJS instance to allow a fresh retry
+  if (gameState.peer) {
+    try {
+      gameState.peer.destroy();
+    } catch(e) {}
+    gameState.peer = null;
+    gameState.peerId = null;
+    gameState.conn = null;
+    gameState.connections = [];
+  }
+  
+  updateLobbyUI();
+}
+
 function initPeer(customId = null) {
   if (gameState.peer) return;
 
@@ -1496,11 +1523,7 @@ function initPeer(customId = null) {
       setupConnection(conn);
     });
 
-    gameState.peer.on('error', (err) => {
-      console.error('PeerJS client error:', err);
-      printLog('[ERROR]: ' + err.message, 'text-red');
-      updateLobbyStatus('ERROR', 'red');
-    });
+    gameState.peer.on('error', handlePeerError);
   } catch (e) {
     console.error('Failed to create PeerJS client', e);
     updateLobbyStatus('FAILED TO INITIALIZE', 'red');
@@ -1550,10 +1573,7 @@ function joinLobby(hostId) {
         gameState.peerId = id;
         connectToHost(hostId);
       });
-      gameState.peer.on('error', (err) => {
-        console.error(err);
-        updateLobbyStatus('ERROR', 'red');
-      });
+      gameState.peer.on('error', handlePeerError);
     } else {
       connectToHost(hostId);
     }
