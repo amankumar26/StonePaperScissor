@@ -457,6 +457,7 @@ body {
   border: 3px solid var(--border-black);
   box-shadow: inset -2px -2px 0px 0px #09090b, inset 2px 2px 0px 0px #3f3f46;
   padding: 4px;
+  position: relative;
 }
 
 .hud-stats {
@@ -1592,6 +1593,33 @@ body {
   0% { transform: scale(0); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* ==========================================================================
+   HUD AVATAR PRESENCE STATUS LIGHTS
+   ========================================================================== */
+.hud-presence-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border-black);
+  z-index: 10;
+  transition: background-color 0.25s, box-shadow 0.25s;
+}
+
+.hud-presence-dot.online {
+  background-color: var(--color-green);
+  box-shadow: 0 0 8px var(--color-green);
+  animation: dotPulse 1.2s infinite alternate;
+}
+
+.hud-presence-dot.offline {
+  background-color: #4b5563;
+  box-shadow: none;
+}
+
 
 
 

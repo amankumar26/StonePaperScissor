@@ -698,7 +698,8 @@ function startGame() {
 
   // Set up player skin SVG in HUD
   const activeSkinCard = document.querySelector('.skin-card.active');
-  hudPlayerAvatar.innerHTML = activeSkinCard.querySelector('.skin-avatar').innerHTML;
+  hudPlayerAvatar.innerHTML = activeSkinCard.querySelector('.skin-avatar').innerHTML + 
+    '<span class="hud-presence-dot online" id="hud-player-presence"></span>';
   hudPlayerName.textContent = gameState.skin.toUpperCase();
 
   // Render blocky avatars on pedestals
@@ -707,12 +708,14 @@ function startGame() {
   if (gameState.mode === 'match') {
     const currentBoss = BOSSES[gameState.bossIndex];
     hudEnemyName.textContent = currentBoss.name;
-    document.querySelector('.hud-avatar.enemy').innerHTML = currentBoss.headSvg;
+    document.querySelector('.hud-avatar.enemy').innerHTML = currentBoss.headSvg + 
+      '<span class="hud-presence-dot online" id="hud-enemy-presence"></span>';
     renderFullBody(currentBoss.skinClass, enemyAvatar3D);
   } else {
     // Endless mode uses Steve-like Herobrine boss initially, but can randomize boss head later
     hudEnemyName.textContent = "HEROBRINE";
-    document.querySelector('.hud-avatar.enemy').innerHTML = BOSSES[0].headSvg;
+    document.querySelector('.hud-avatar.enemy').innerHTML = BOSSES[0].headSvg + 
+      '<span class="hud-presence-dot online" id="hud-enemy-presence"></span>';
     renderFullBody("skin-boss", enemyAvatar3D);
   }
 
@@ -1724,6 +1727,7 @@ function handlePeerMessage(data, conn) {
 
           // If in battle screen, restore the reconnecting player's pedestal visual
           if (gameState.screen === 'battle') {
+            updateBattleHUDPresence();
             // Check if they need to be resolved or if all choices are locked
             let allChosen = true;
             for (let pId in gameState.players) {
@@ -1781,6 +1785,7 @@ function handlePeerMessage(data, conn) {
         if (gameState.timerEnabled && !gameState.isLocked) {
           startRoundTimer();
         }
+        updateBattleHUDPresence();
       } else {
         printLog(`[MULTIPLAYER]: You entered the lobby as PLAYER ${data.playerIndex}`, 'text-yellow');
         sendPeerMessage({ type: 'skin', skin: gameState.skin });
@@ -1791,6 +1796,7 @@ function handlePeerMessage(data, conn) {
     case 'players_update':
       gameState.players = data.players;
       updateLobbyUI();
+      updateBattleHUDPresence();
       break;
 
     case 'skin':
@@ -2067,6 +2073,7 @@ function handlePeerDisconnect(closedConn) {
     if (senderIndex && gameState.players[senderIndex]) {
       gameState.players[senderIndex].connected = false;
       gameState.players[senderIndex].choice = 'timeout';
+      updateBattleHUDPresence();
     }
     
     let activeHumanCount = 1; // Host is always active
@@ -2252,6 +2259,37 @@ function initMultiplayerPedestals() {
   }
 }
 
+function updateBattleHUDPresence() {
+  if (gameState.screen !== 'battle' || gameState.mode !== 'versus') return;
+  
+  // Update local player presence
+  const playerDot = document.getElementById('hud-player-presence');
+  if (playerDot) {
+    playerDot.className = 'hud-presence-dot online';
+  }
+  
+  // Find the first opponent (different from local playerIndex)
+  let opponentIndex = null;
+  for (let pId in gameState.players) {
+    if (pId != gameState.playerIndex) {
+      opponentIndex = pId;
+      break;
+    }
+  }
+  
+  if (opponentIndex && gameState.players[opponentIndex]) {
+    const opponent = gameState.players[opponentIndex];
+    const enemyDot = document.getElementById('hud-enemy-presence');
+    if (enemyDot) {
+      if (opponent.connected === true) {
+        enemyDot.className = 'hud-presence-dot online';
+      } else {
+        enemyDot.className = 'hud-presence-dot offline';
+      }
+    }
+  }
+}
+
 function startVersusBattle() {
   gameState.score = 0;
   gameState.streak = 0;
@@ -2293,6 +2331,42 @@ function startVersusBattle() {
   }
 
   initMultiplayerPedestals();
+
+  if (gameState.mode === 'versus') {
+    const localPlayer = gameState.players[gameState.playerIndex];
+    if (localPlayer) {
+      const localSkinKey = localPlayer.skin || 'steve';
+      const localSkinSvg = SKINS[localSkinKey] ? SKINS[localSkinKey].headSvg : SKINS.steve.headSvg;
+      hudPlayerAvatar.innerHTML = localSkinSvg + '<span class="hud-presence-dot online" id="hud-player-presence"></span>';
+      hudPlayerName.textContent = `YOU (P${gameState.playerIndex})`;
+    }
+
+    let opponentIndex = null;
+    for (let pId in gameState.players) {
+      if (pId != gameState.playerIndex) {
+        opponentIndex = pId;
+        break;
+      }
+    }
+
+    const enemyAvatarEl = document.querySelector('.hud-avatar.enemy');
+    if (opponentIndex && gameState.players[opponentIndex]) {
+      const opponent = gameState.players[opponentIndex];
+      const opponentSkinKey = opponent.skin || 'steve';
+      const opponentSkinSvg = SKINS[opponentSkinKey] ? SKINS[opponentSkinKey].headSvg : SKINS.steve.headSvg;
+      const opponentConnected = opponent.connected === true;
+      
+      enemyAvatarEl.innerHTML = opponentSkinSvg + 
+        `<span class="hud-presence-dot ${opponentConnected ? 'online' : 'offline'}" id="hud-enemy-presence"></span>`;
+      hudEnemyName.textContent = opponent.name || `PLAYER ${opponentIndex}`;
+      if (hudEnemyName.textContent.includes(' (')) {
+        hudEnemyName.textContent = hudEnemyName.textContent.split(' (')[0];
+      }
+    } else {
+      enemyAvatarEl.innerHTML = BOSSES[0].headSvg + '<span class="hud-presence-dot offline" id="hud-enemy-presence"></span>';
+      hudEnemyName.textContent = "NO OPPONENT";
+    }
+  }
 
   const choicesContainer = document.querySelector('.choices-container');
   if (choicesContainer) {
