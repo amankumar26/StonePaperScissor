@@ -1620,6 +1620,28 @@ body {
   box-shadow: none;
 }
 
+/* ==========================================================================
+   WEBCAM / CAMERA SYSTEM
+   ========================================================================== */
+.camera-box {
+  background-color: var(--panel-dark);
+  border: 4px solid var(--border-black);
+  box-shadow: 
+    inset -4px -4px 0px 0px var(--bevel-dark),
+    inset 4px 4px 0px 0px #313138,
+    4px 4px 0px 0px rgba(0, 0, 0, 0.4);
+}
+
+#camera-placeholder {
+  animation: cameraPulse 2s infinite alternate;
+}
+
+@keyframes cameraPulse {
+  0% { color: #55555c; }
+  100% { color: #888896; }
+}
+
+
 
 
 

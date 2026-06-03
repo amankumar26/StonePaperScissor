@@ -574,9 +574,33 @@
                 </div>
               </div>
 
+              <!-- Loser completing Dare camera section -->
+              <div id="tod-dare-camera-container" style="display: none; border-top: 2px dashed rgba(255,255,255,0.15); padding-top: 12px; text-align: center;">
+                <p class="pixel-subtitle" style="font-size: 9px; color: var(--color-cyan); margin-bottom: 8px;">PERFORM YOUR DARE:</p>
+                
+                <!-- Camera Controls & Preview -->
+                <div class="camera-box pixel-box-dark" style="margin: 0 auto 12px; padding: 8px; display: inline-block; width: 100%; max-width: 320px; box-sizing: border-box;">
+                  <!-- Video stream for live camera preview -->
+                  <div style="position: relative; width: 100%; background: #000; border: 2px solid var(--border-black); border-radius: 4px; overflow: hidden; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center;">
+                    <video id="camera-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; display: none; transform: scaleX(-1);"></video>
+                    <canvas id="camera-canvas" style="display: none;"></canvas>
+                    <img id="camera-photo-preview" style="width: 100%; height: 100%; object-fit: cover; display: none; transform: scaleX(-1);" />
+                    <div id="camera-placeholder" style="font-family: var(--font-pixel-sub); font-size: 9px; color: #888; text-transform: uppercase;">Camera Off</div>
+                  </div>
+                  
+                  <!-- Camera Action Buttons -->
+                  <div style="display: flex; gap: 6px; justify-content: center; margin-top: 8px; flex-wrap: wrap;">
+                    <button id="btn-camera-toggle" class="pixel-btn-small" style="padding: 6px 10px; font-size: 8px;">ENABLE CAMERA</button>
+                    <button id="btn-camera-capture" class="pixel-btn-small" style="padding: 6px 10px; font-size: 8px; display: none;">TAKE PHOTO</button>
+                    <button id="btn-camera-retake" class="pixel-btn-small" style="padding: 6px 10px; font-size: 8px; display: none;">RETAKE</button>
+                    <button id="btn-camera-send" class="pixel-btn-small" style="padding: 6px 10px; font-size: 8px; display: none; background-color: var(--color-green); border-color: var(--border-black);">SEND PHOTO</button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Display of submitted answers -->
               <div id="tod-answers-display-container" style="display: none; margin-top: 10px; text-align: left; background: rgba(0,0,0,0.3); border: 2px solid var(--border-black); padding: 8px;">
-                <p class="pixel-subtitle" style="font-size: 9px; color: var(--color-green); margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">ANSWERS:</p>
+                <p id="tod-answers-title" class="pixel-subtitle" style="font-size: 9px; color: var(--color-green); margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;">ANSWERS:</p>
                 <div id="tod-answers-list" style="font-family: monospace; font-size: 10px; max-height: 100px; overflow-y: auto;">
                   <!-- Answers populated via JS -->
                 </div>

@@ -416,6 +416,17 @@ const statMaxStreak = document.getElementById('stat-max-streak');
 const statHighScore = document.getElementById('stat-high-score');
 const statRounds = document.getElementById('stat-rounds');
 
+// Camera DOM Selectors
+const todDareCameraContainer = document.getElementById('tod-dare-camera-container');
+const cameraVideo = document.getElementById('camera-video');
+const cameraCanvas = document.getElementById('camera-canvas');
+const cameraPhotoPreview = document.getElementById('camera-photo-preview');
+const cameraPlaceholder = document.getElementById('camera-placeholder');
+const btnCameraToggle = document.getElementById('btn-camera-toggle');
+const btnCameraCapture = document.getElementById('btn-camera-capture');
+const btnCameraRetake = document.getElementById('btn-camera-retake');
+const btnCameraSend = document.getElementById('btn-camera-send');
+
 // 7. SETUP EVENT LISTENERS
 
 // Skin select click handlers
@@ -594,6 +605,11 @@ function switchScreen(screenName) {
   } else if (screenName === 'gameover') {
     screenGameOver.classList.add('active');
   }
+  
+  if (screenName !== 'gameover') {
+    stopCamera();
+  }
+  
   updateRulesContent();
 }
 
@@ -1934,17 +1950,31 @@ function handlePeerMessage(data, conn) {
       const ansInputContainer = document.getElementById('tod-answer-input-container');
       const ansDisplayContainer = document.getElementById('tod-answers-display-container');
       const ansList = document.getElementById('tod-answers-list');
+      const answersTitle = document.getElementById('tod-answers-title');
       
       if (ansList) ansList.innerHTML = '';
-      if (ansDisplayContainer) ansDisplayContainer.style.display = data.qType === 'truth' ? 'block' : 'none';
+      if (ansDisplayContainer) ansDisplayContainer.style.display = 'block';
+      if (answersTitle) {
+        answersTitle.textContent = data.qType === 'truth' ? "ANSWERS:" : "PROOF SUBMISSIONS:";
+      }
       
-      // If we are a loser (meaning not the winnerIndex), and it's truth, show answer input
-      if (data.qType === 'truth' && gameState.playerIndex != data.winnerIndex) {
-        if (ansInputContainer) ansInputContainer.style.display = 'block';
-        const ansInput = document.getElementById('tod-answer-input');
-        if (ansInput) ansInput.value = '';
+      // If we are a loser (meaning not the winnerIndex)
+      if (gameState.playerIndex != data.winnerIndex) {
+        if (data.qType === 'truth') {
+          if (ansInputContainer) ansInputContainer.style.display = 'block';
+          const ansInput = document.getElementById('tod-answer-input');
+          if (ansInput) ansInput.value = '';
+          if (todDareCameraContainer) todDareCameraContainer.style.display = 'none';
+        } else {
+          if (ansInputContainer) ansInputContainer.style.display = 'none';
+          if (todDareCameraContainer) {
+            todDareCameraContainer.style.display = 'block';
+            stopCamera(); // Ensure camera starts clean
+          }
+        }
       } else {
         if (ansInputContainer) ansInputContainer.style.display = 'none';
+        if (todDareCameraContainer) todDareCameraContainer.style.display = 'none';
       }
       
       playVictoryFanfare();
@@ -1966,6 +1996,11 @@ function handlePeerMessage(data, conn) {
         const pSkin = (gameState.players[pIndex] && gameState.players[pIndex].skin) ? gameState.players[pIndex].skin.toUpperCase() : `P${pIndex}`;
         const answersList = document.getElementById('tod-answers-list');
         const answersDisplay = document.getElementById('tod-answers-display-container');
+        const answersTitle = document.getElementById('tod-answers-title');
+        
+        if (answersTitle) {
+          answersTitle.textContent = "ANSWERS:";
+        }
         
         if (answersList) {
           const div = document.createElement('div');
@@ -1978,6 +2013,46 @@ function handlePeerMessage(data, conn) {
           answersDisplay.style.display = 'block';
         }
         printLog(`[MULTIPLAYER]: ${pSkin} answered: "${data.answerText}"`, 'text-green');
+        playClickSound();
+      }
+      break;
+
+    case 'tod_photo':
+      if (gameState.isHost && senderIndex) {
+        // Broadcast the photo to all clients
+        broadcast({
+          type: 'tod_photo',
+          senderIndex: senderIndex,
+          photoData: data.photoData
+        });
+      }
+      
+      const photoSenderIdx = data.senderIndex || senderIndex;
+      if (photoSenderIdx) {
+        const pSkin = (gameState.players[photoSenderIdx] && gameState.players[photoSenderIdx].skin) ? gameState.players[photoSenderIdx].skin.toUpperCase() : `P${photoSenderIdx}`;
+        const answersList = document.getElementById('tod-answers-list');
+        const answersDisplay = document.getElementById('tod-answers-display-container');
+        const answersTitle = document.getElementById('tod-answers-title');
+        
+        if (answersTitle) {
+          answersTitle.textContent = "PROOF SUBMISSIONS:";
+        }
+        
+        if (answersList) {
+          const div = document.createElement('div');
+          div.style.marginBottom = '8px';
+          div.style.display = 'flex';
+          div.style.flexDirection = 'column';
+          div.style.gap = '4px';
+          div.innerHTML = `<span class="text-cyan">${pSkin} (Captured Dare):</span> 
+                           <img src="${data.photoData}" style="max-width: 100%; max-height: 150px; border: 2px solid var(--border-black); border-radius: 4px; object-fit: contain; margin-top: 4px;" />`;
+          answersList.appendChild(div);
+          answersList.scrollTop = answersList.scrollHeight;
+        }
+        if (answersDisplay) {
+          answersDisplay.style.display = 'block';
+        }
+        printLog(`[MULTIPLAYER]: ${pSkin} sent proof for the dare.`, 'text-green');
         playClickSound();
       }
       break;
@@ -2898,6 +2973,7 @@ function endVersusGame(winnerIndex) {
       if (todAnsList) todAnsList.innerHTML = '';
       if (todAnsDisplayContainer) todAnsDisplayContainer.style.display = 'none';
       if (todAnsInputContainer) todAnsInputContainer.style.display = 'none';
+      if (todDareCameraContainer) todDareCameraContainer.style.display = 'none';
       
       if (winnerIndex == gameState.playerIndex) {
         gameState.todType = 'truth';
@@ -2980,7 +3056,11 @@ function submitWinnerTod() {
   if (textDisplay) textDisplay.textContent = text;
   
   if (ansDisplayContainer) {
-    ansDisplayContainer.style.display = gameState.todType === 'truth' ? 'block' : 'none';
+    ansDisplayContainer.style.display = 'block';
+  }
+  const answersTitle = document.getElementById('tod-answers-title');
+  if (answersTitle) {
+    answersTitle.textContent = gameState.todType === 'truth' ? "ANSWERS:" : "PROOF SUBMISSIONS:";
   }
 
   sendPeerMessage({
@@ -3135,6 +3215,154 @@ if (btnSubmitTodAnswer && todAnswerInput) {
       playClickSound();
       submitLoserAnswer();
     }
+  });
+}
+
+/* ==========================================================================
+   WEBCAM / CAMERA SYSTEM FOR DARE MODE
+   ========================================================================== */
+let localMediaStream = null;
+
+async function startCamera() {
+  try {
+    localMediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 320 }, height: { ideal: 240 } },
+      audio: false
+    });
+    
+    if (cameraVideo) {
+      cameraVideo.srcObject = localMediaStream;
+      cameraVideo.style.display = 'block';
+    }
+    if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
+    if (cameraPhotoPreview) cameraPhotoPreview.style.display = 'none';
+    if (btnCameraToggle) btnCameraToggle.textContent = 'DISABLE CAMERA';
+    if (btnCameraCapture) btnCameraCapture.style.display = 'inline-block';
+    if (btnCameraRetake) btnCameraRetake.style.display = 'none';
+    if (btnCameraSend) btnCameraSend.style.display = 'none';
+  } catch (err) {
+    console.error('Error accessing webcam: ', err);
+    printLog('[SYSTEM]: Failed to access camera. Please check browser permissions.', 'text-red');
+  }
+}
+
+function stopCamera() {
+  if (localMediaStream) {
+    localMediaStream.getTracks().forEach(track => track.stop());
+    localMediaStream = null;
+  }
+  if (cameraVideo) {
+    cameraVideo.srcObject = null;
+    cameraVideo.style.display = 'none';
+  }
+  if (cameraPhotoPreview) cameraPhotoPreview.style.display = 'none';
+  if (cameraPlaceholder) cameraPlaceholder.style.display = 'flex';
+  if (btnCameraToggle) btnCameraToggle.textContent = 'ENABLE CAMERA';
+  if (btnCameraCapture) btnCameraCapture.style.display = 'none';
+  if (btnCameraRetake) btnCameraRetake.style.display = 'none';
+  if (btnCameraSend) btnCameraSend.style.display = 'none';
+}
+
+function capturePhoto() {
+  if (!cameraVideo || !cameraCanvas || !cameraPhotoPreview) return;
+  
+  const context = cameraCanvas.getContext('2d');
+  const w = 320;
+  const h = 240;
+  cameraCanvas.width = w;
+  cameraCanvas.height = h;
+  
+  // Flip image horizontally for the mirror effect before capturing
+  context.save();
+  context.translate(w, 0);
+  context.scale(-1, 1);
+  context.drawImage(cameraVideo, 0, 0, w, h);
+  context.restore();
+  
+  const dataUrl = cameraCanvas.toDataURL('image/jpeg', 0.6);
+  
+  cameraPhotoPreview.src = dataUrl;
+  cameraPhotoPreview.style.display = 'block';
+  cameraVideo.style.display = 'none';
+  
+  if (btnCameraCapture) btnCameraCapture.style.display = 'none';
+  if (btnCameraRetake) btnCameraRetake.style.display = 'inline-block';
+  if (btnCameraSend) btnCameraSend.style.display = 'inline-block';
+}
+
+function retakePhoto() {
+  if (cameraPhotoPreview) cameraPhotoPreview.style.display = 'none';
+  if (cameraVideo) cameraVideo.style.display = 'block';
+  
+  if (btnCameraCapture) btnCameraCapture.style.display = 'inline-block';
+  if (btnCameraRetake) btnCameraRetake.style.display = 'none';
+  if (btnCameraSend) btnCameraSend.style.display = 'none';
+}
+
+function sendPhoto() {
+  if (!cameraPhotoPreview || !cameraPhotoPreview.src) return;
+  const photoData = cameraPhotoPreview.src;
+  
+  const localPlayer = gameState.players[gameState.playerIndex];
+  const pSkin = (localPlayer && localPlayer.skin) ? localPlayer.skin.toUpperCase() : `YOU`;
+  
+  const answersList = document.getElementById('tod-answers-list');
+  const answersDisplay = document.getElementById('tod-answers-display-container');
+  const answersTitle = document.getElementById('tod-answers-title');
+  
+  if (answersTitle) answersTitle.textContent = "PROOF SUBMISSIONS:";
+  if (answersList) {
+    const div = document.createElement('div');
+    div.style.marginBottom = '8px';
+    div.style.display = 'flex';
+    div.style.flexDirection = 'column';
+    div.style.gap = '4px';
+    div.innerHTML = `<span class="text-cyan">${pSkin} (Captured Dare):</span> 
+                     <img src="${photoData}" style="max-width: 100%; max-height: 150px; border: 2px solid var(--border-black); border-radius: 4px; object-fit: contain; margin-top: 4px;" />`;
+    answersList.appendChild(div);
+    answersList.scrollTop = answersList.scrollHeight;
+  }
+  
+  if (answersDisplay) answersDisplay.style.display = 'block';
+  
+  sendPeerMessage({
+    type: 'tod_photo',
+    photoData: photoData
+  });
+  
+  printLog('[MULTIPLAYER]: You sent your captured photo as proof!', 'text-green');
+  
+  stopCamera();
+  if (todDareCameraContainer) todDareCameraContainer.style.display = 'none';
+}
+
+// Camera control event listeners
+if (btnCameraToggle) {
+  btnCameraToggle.addEventListener('click', () => {
+    playClickSound();
+    if (localMediaStream) {
+      stopCamera();
+    } else {
+      startCamera();
+    }
+  });
+}
+if (btnCameraCapture) {
+  btnCameraCapture.addEventListener('click', () => {
+    playClickSound();
+    capturePhoto();
+  });
+}
+if (btnCameraRetake) {
+  btnCameraRetake.addEventListener('click', () => {
+    playClickSound();
+    retakePhoto();
+  });
+}
+if (btnCameraSend) {
+  btnCameraSend.addEventListener('click', () => {
+    playClickSound();
+    sendPhoto();
   });
 }
 
