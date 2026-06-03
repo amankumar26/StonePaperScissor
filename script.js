@@ -1847,13 +1847,57 @@ function handlePeerMessage(data, conn) {
       }
       break;
 
+    case 'tod_choice_change':
+      if (gameState.isHost && senderIndex) {
+        broadcast({
+          type: 'tod_choice_change',
+          choice: data.choice,
+          senderIndex: senderIndex
+        });
+      }
+      
+      const choiceWinnerIdx = data.senderIndex || senderIndex || 1;
+      const winnerSkin = (gameState.players[choiceWinnerIdx] && gameState.players[choiceWinnerIdx].skin)
+        ? gameState.players[choiceWinnerIdx].skin.toUpperCase()
+        : `PLAYER ${choiceWinnerIdx}`;
+      
+      const textDisp = document.getElementById('tod-text-display');
+      const titleDisp = document.getElementById('tod-display-title');
+      
+      if (titleDisp) {
+        titleDisp.textContent = data.choice === 'truth' ? "THE WINNER'S TRUTH QUESTION:" : "THE WINNER'S DARE:";
+      }
+      if (textDisp) {
+        textDisp.textContent = `Winner ${winnerSkin} is choosing a ${data.choice.toUpperCase()} action...`;
+      }
+      break;
+
+    case 'tod_typing':
+      if (gameState.isHost && senderIndex) {
+        broadcast({
+          type: 'tod_typing',
+          typing: data.typing,
+          senderIndex: senderIndex
+        });
+      }
+      
+      const typingIndicator = document.getElementById('tod-typing-indicator');
+      if (typingIndicator) {
+        typingIndicator.style.display = data.typing ? 'block' : 'none';
+      }
+      break;
+
     case 'tod_question':
       gameState.todType = data.qType;
       gameState.todQuestion = data.text;
       
       const displayTitle = document.getElementById('tod-display-title');
       const textDisplay = document.getElementById('tod-text-display');
+      const typingEl = document.getElementById('tod-typing-indicator');
       
+      if (typingEl) {
+        typingEl.style.display = 'none';
+      }
       if (displayTitle) {
         displayTitle.textContent = data.qType === 'truth' ? "THE WINNER'S TRUTH QUESTION:" : "THE WINNER'S DARE:";
       }
@@ -2773,8 +2817,11 @@ function endVersusGame(winnerIndex) {
         if (todInputContainer) todInputContainer.style.display = 'none';
         if (todDisplayContainer) {
           todDisplayContainer.style.display = 'block';
-          if (todDisplayTitle) todDisplayTitle.textContent = "STATUS:";
-          if (todTextDisplay) todTextDisplay.textContent = 'Waiting for the winner to choose Truth or Dare...';
+          if (todDisplayTitle) todDisplayTitle.textContent = "THE WINNER'S TRUTH QUESTION:";
+          const winnerSkinName = (gameState.players[winnerIndex] && gameState.players[winnerIndex].skin)
+            ? gameState.players[winnerIndex].skin.toUpperCase()
+            : `PLAYER ${winnerIndex}`;
+          if (todTextDisplay) todTextDisplay.textContent = `Winner ${winnerSkinName} is choosing a TRUTH action...`;
         }
       }
     } else {
@@ -2924,6 +2971,9 @@ if (btnChooseTruth) {
     gameState.todType = 'truth';
     updateTodChoiceButtonsUI();
     updateTodInputLabelUI();
+    if (gameState.mode === 'versus') {
+      sendPeerMessage({ type: 'tod_choice_change', choice: 'truth' });
+    }
   });
 }
 if (btnChooseDare) {
@@ -2932,16 +2982,51 @@ if (btnChooseDare) {
     gameState.todType = 'dare';
     updateTodChoiceButtonsUI();
     updateTodInputLabelUI();
+    if (gameState.mode === 'versus') {
+      sendPeerMessage({ type: 'tod_choice_change', choice: 'dare' });
+    }
   });
 }
+
+let todTypingTimeout = null;
+let isTodTypingLocal = false;
+
 if (btnSubmitTod && todTextInput) {
+  todTextInput.addEventListener('input', () => {
+    if (gameState.mode !== 'versus') return;
+    if (!isTodTypingLocal) {
+      isTodTypingLocal = true;
+      sendPeerMessage({ type: 'tod_typing', typing: true });
+    }
+    clearTimeout(todTypingTimeout);
+    todTypingTimeout = setTimeout(() => {
+      isTodTypingLocal = false;
+      sendPeerMessage({ type: 'tod_typing', typing: false });
+    }, 1500);
+  });
+
+  todTextInput.addEventListener('blur', () => {
+    if (gameState.mode !== 'versus') return;
+    if (isTodTypingLocal) {
+      isTodTypingLocal = false;
+      clearTimeout(todTypingTimeout);
+      sendPeerMessage({ type: 'tod_typing', typing: false });
+    }
+  });
+
   btnSubmitTod.addEventListener('click', () => {
     playClickSound();
+    isTodTypingLocal = false;
+    clearTimeout(todTypingTimeout);
+    sendPeerMessage({ type: 'tod_typing', typing: false });
     submitWinnerTod();
   });
   todTextInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       playClickSound();
+      isTodTypingLocal = false;
+      clearTimeout(todTypingTimeout);
+      sendPeerMessage({ type: 'tod_typing', typing: false });
       submitWinnerTod();
     }
   });
