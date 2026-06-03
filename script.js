@@ -513,8 +513,8 @@ playBtn.addEventListener('click', () => {
   playClickSound();
 
   if (gameState.mode === 'versus') {
-    const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
-    const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
+    const savedLobbyId = localStorage.getItem('voxel_lobby_id');
+    const savedPlayerIndex = localStorage.getItem('voxel_player_index');
     
     // If we have a saved lobby and we are currently disconnected
     if (savedLobbyId && (!gameState.peer || (!gameState.peerId && !gameState.conn))) {
@@ -563,8 +563,8 @@ restartBtn.addEventListener('click', () => {
 menuBtn.addEventListener('click', () => {
   playClickSound();
   stopRoundTimer();
-  sessionStorage.removeItem('voxel_player_index');
-  sessionStorage.removeItem('voxel_lobby_id');
+  localStorage.removeItem('voxel_player_index');
+  localStorage.removeItem('voxel_lobby_id');
   switchScreen('splash');
 });
 
@@ -1333,8 +1333,8 @@ function updateLobbyUI() {
   const connectedCount = Object.keys(gameState.players).length;
   const isFull = connectedCount === gameState.maxPlayers;
 
-  const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
-  const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
+  const savedLobbyId = localStorage.getItem('voxel_lobby_id');
+  const savedPlayerIndex = localStorage.getItem('voxel_player_index');
   const reconnectPanel = document.getElementById('lobby-reconnect-controls');
   const btnReconnectLobby = document.getElementById('btn-reconnect-lobby');
   if (reconnectPanel) {
@@ -1498,8 +1498,8 @@ function initPeer(customId = null) {
         1: { skin: gameState.skin, choice: null, hp: 3, name: 'YOU (HOST)', isAlive: true, rematchReady: false }
       };
       
-      sessionStorage.setItem('voxel_lobby_id', id);
-      sessionStorage.setItem('voxel_player_index', '1');
+      localStorage.setItem('voxel_lobby_id', id);
+      localStorage.setItem('voxel_player_index', '1');
       
       console.log('PeerJS initialized with ID:', id);
       
@@ -1557,8 +1557,8 @@ function joinLobby(hostId) {
   hostId = extractPeerId(hostId);
   if (!hostId) return;
   
-  const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
-  const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
+  const savedLobbyId = localStorage.getItem('voxel_lobby_id');
+  const savedPlayerIndex = localStorage.getItem('voxel_player_index');
   
   // If we are host and entered our own lobby ID/link, re-host it
   if (savedLobbyId === hostId && savedPlayerIndex === '1') {
@@ -1609,8 +1609,8 @@ function setupConnection(conn) {
       playClickSound();
       printLog('[MULTIPLAYER]: Connected to host lobby! Synchronizing...', 'text-green');
 
-      const savedLobbyId = sessionStorage.getItem('voxel_lobby_id');
-      const savedPlayerIndex = sessionStorage.getItem('voxel_player_index');
+      const savedLobbyId = localStorage.getItem('voxel_lobby_id');
+      const savedPlayerIndex = localStorage.getItem('voxel_player_index');
       
       if (savedLobbyId === conn.peer && savedPlayerIndex) {
         conn.send({
@@ -1758,9 +1758,9 @@ function handlePeerMessage(data, conn) {
       }
       updateLobbyGameTypeUI();
       
-      sessionStorage.setItem('voxel_player_index', data.playerIndex);
+      localStorage.setItem('voxel_player_index', data.playerIndex);
       if (gameState.conn && gameState.conn.peer) {
-        sessionStorage.setItem('voxel_lobby_id', gameState.conn.peer);
+        localStorage.setItem('voxel_lobby_id', gameState.conn.peer);
       }
       
       if (data.reconnect) {
@@ -2774,8 +2774,8 @@ function checkVersusGameStatus() {
 function endVersusGame(winnerIndex) {
   stopRoundTimer();
   
-  sessionStorage.removeItem('voxel_player_index');
-  sessionStorage.removeItem('voxel_lobby_id');
+  localStorage.removeItem('voxel_player_index');
+  localStorage.removeItem('voxel_lobby_id');
   
   // Save High Score for current mode
   let scoreKey = 'voxel_highscore_endless';
