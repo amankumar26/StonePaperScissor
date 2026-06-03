@@ -249,6 +249,14 @@
                 <span id="lobby-status-text" class="pixel-subtitle" style="font-size: 10px; letter-spacing: 1px; margin: 0; color: #fff;">STATUS: DISCONNECTED</span>
               </div>
               
+              <!-- Lobby Players List -->
+              <div id="lobby-players-container" style="margin-bottom: 16px; background: rgba(0,0,0,0.2); border: 2px solid var(--border-black); padding: 12px;">
+                <p class="pixel-subtitle" style="font-size: 9px; color: var(--color-cyan); margin-bottom: 8px; text-transform: uppercase;">PLAYERS IN LOBBY</p>
+                <div id="lobby-players-list" class="lobby-players-grid">
+                  <!-- Rendered dynamically in script.js -->
+                </div>
+              </div>
+              
               <!-- Reconnect Option -->
               <div id="lobby-reconnect-controls" style="display: none; margin-bottom: 16px; background: rgba(16, 185, 129, 0.1); border: 2px dashed #10b981; padding: 12px; text-align: center;">
                 <p class="mode-description" style="margin-bottom: 8px; color: #a7f3d0; font-weight: bold; font-size: 10px;">DISCONNECTED MID-GAME?</p>

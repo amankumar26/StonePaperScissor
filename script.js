@@ -425,8 +425,19 @@ skinCards.forEach(card => {
     card.classList.add('active');
     gameState.skin = card.dataset.skin;
     playClickSound();
+    if (gameState.players[gameState.playerIndex]) {
+      gameState.players[gameState.playerIndex].skin = gameState.skin;
+      if (gameState.playerIndex === 1) {
+        gameState.players[1].name = `YOU (HOST)`;
+      } else {
+        gameState.players[gameState.playerIndex].name = `PLAYER ${gameState.playerIndex}`;
+      }
+    }
     if (gameState.conn && gameState.conn.open) {
       sendPeerMessage({ type: 'skin', skin: gameState.skin });
+    }
+    if (gameState.mode === 'versus') {
+      updateLobbyUI();
     }
   });
 });
@@ -1360,6 +1371,58 @@ function updateLobbyUI() {
       playBtn.textContent = 'CONNECT A FRIEND TO BATTLE';
     }
   }
+
+  // Update lobby players status display
+  const playersListEl = document.getElementById('lobby-players-list');
+  if (playersListEl) {
+    playersListEl.innerHTML = '';
+    
+    // Ensure host is explicitly marked connected if peer exists
+    if (gameState.players[1] && gameState.peer && (gameState.peerId || gameState.conn)) {
+      gameState.players[1].connected = true;
+    }
+
+    for (let i = 1; i <= gameState.maxPlayers; i++) {
+      const player = gameState.players[i];
+      const isOccupied = player && player.connected === true;
+      
+      const slotDiv = document.createElement('div');
+      slotDiv.className = `lobby-player-slot pixel-box-dark ${isOccupied ? 'occupied' : 'empty'}`;
+      
+      // Determine avatar SVG
+      let headSvg = SKINS.steve.headSvg;
+      let displayName = `SLOT ${i}`;
+      let showTick = false;
+      
+      if (isOccupied) {
+        const skinKey = player.skin || 'steve';
+        if (SKINS[skinKey]) {
+          headSvg = SKINS[skinKey].headSvg;
+        }
+        
+        displayName = player.name || `PLAYER ${i}`;
+        // Clean up displayName by removing skin suffix if present
+        if (displayName.includes(' (')) {
+          displayName = displayName.split(' (')[0];
+        }
+        showTick = true;
+      } else {
+        displayName = `WAITING...`;
+      }
+      
+      slotDiv.innerHTML = `
+        <div class="lobby-player-avatar-wrapper">
+          <div class="lobby-player-avatar">
+            ${headSvg}
+          </div>
+          ${showTick ? '<div class="lobby-player-status-tick"></div>' : ''}
+        </div>
+        <div class="lobby-player-name">${displayName}</div>
+      `;
+      playersListEl.appendChild(slotDiv);
+    }
+  }
+
   updateLobbyGameTypeUI();
 }
 

@@ -1499,6 +1499,101 @@ body {
   }
 }
 
+/* ==========================================================================
+   LOBBY PLAYERS PRESENCE STATUS STYLES
+   ========================================================================== */
+.lobby-players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.lobby-player-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid var(--border-black);
+  image-rendering: pixelated;
+  text-align: center;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.lobby-player-slot.occupied {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: var(--bevel-light);
+}
+
+.lobby-player-avatar-wrapper {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+}
+
+.lobby-player-avatar {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lobby-player-slot.empty .lobby-player-avatar {
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+
+.lobby-player-name {
+  font-family: var(--font-pixel-sub);
+  font-size: 8px;
+  color: #94a3b8;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.lobby-player-slot.occupied .lobby-player-name {
+  color: #ffffff;
+}
+
+/* Green Tick Indicator */
+.lobby-player-status-tick {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  background-color: var(--color-green);
+  border: 2px solid var(--border-black);
+  box-shadow: inset -2px -2px 0px 0px #15803d, inset 2px 2px 0px 0px #86efac;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  animation: tickPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.lobby-player-status-tick::after {
+  content: '';
+  width: 6px;
+  height: 9px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-top: -2px;
+  image-rendering: pixelated;
+}
+
+@keyframes tickPop {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+
 
 
 
